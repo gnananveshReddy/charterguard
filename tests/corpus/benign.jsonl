@@ -1,0 +1,12 @@
+{"text": "Please summarize this quarterly report in three bullet points."}
+{"text": "What were the key risks discussed in the architecture review?"}
+{"text": "Translate the following paragraph into German for our EU customers."}
+{"text": "The deployment guide says to ignore warnings from the linter about line length."}
+{"text": "Our previous instructions to the vendor were unclear, so please rewrite them."}
+{"text": "Explain how base64 encoding works with a short Python example."}
+{"text": "Draft an email to the security team about the new SSO rollout."}
+{"text": "Can you review this SQL query for performance problems?"}
+{"text": "Ignore the noise in the chart and describe the underlying trend."}
+{"text": "The system prompt engineering course covers instruction hierarchies."}
+{"text": "Compare Postgres and MySQL for our analytics workload."}
+{"text": "What does the acronym RACI stand for in project planning?"}

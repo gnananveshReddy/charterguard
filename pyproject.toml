@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-guardrails"
+version = "1.3.0"
+description = "Framework-agnostic guardrail pipeline for LLM agent harnesses: injection, jailbreak, scope, redaction, grounding, audit."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["llm", "agents", "guardrails", "prompt-injection", "security"]
+# Deliberately zero runtime dependencies: this component must drop into any
+# project without dragging a framework, a model SDK, or a regex engine with it.
+dependencies = []
+
+[project.optional-dependencies]
+# Every extra is genuinely optional: the core, the FastAPI-free path, and all
+# stdlib adapters (logging/console/statsd metrics, sqlite ledger + audit, HTTP
+# model/intent/NER, keyword intent, gazetteer NER) work with none of these
+# installed. Install only the tier you actually operate.
+fastapi = ["fastapi>=0.110"]
+# Cross-host session ceilings. Needed only if you run more than one host.
+redis = ["redis>=5.0"]
+# Metrics egress. Pick one; installing both is supported but pointless.
+prometheus = ["prometheus-client>=0.20"]
+otel = ["opentelemetry-api>=1.24"]
+# Free-text PII (names, locations). Both also require a spaCy model download,
+# which pip cannot express -- see docs/ADAPTERS.md.
+spacy = ["spacy>=3.7"]
+presidio = ["presidio-analyzer>=2.2", "spacy>=3.7"]
+# Local model tier. onnxruntime + tokenizers only: no torch, no transformers,
+# and no weights are bundled. Weights are fetched by pinned commit SHA and
+# verified by SHA-256 at load. See SECURITY.md.
+onnx = ["onnxruntime>=1.17", "tokenizers>=0.15"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_guardrails"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["error"]
