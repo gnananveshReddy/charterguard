@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from .config import RedactionConfig
-from .types import Category, Finding
+from .types import Finding
 
 _KIND_BY_PREFIX = {
     "sec.": "SECRET",

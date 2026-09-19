@@ -14,6 +14,11 @@ Dependency tiers, so you can see what a name costs before you use it:
                     HttpIntentClassifier, HttpEntityRecognizer,
                     KeywordIntentClassifier, GazetteerEntityRecognizer
     [fastapi]    -- guardrail_middleware
+    [langgraph]  -- (nodes are plain callables and need no third-party import;
+                    only approval_node() needs langgraph, and only at call time
+                    unless you pass your own interrupt_fn)
+    [langchain]  -- guard_input, guard_output, guard_output_stream,
+                    guard_retrieval, guard_tool, guarded_tools, GuardedRetriever
     [redis]      -- RedisCounterStore
     [prometheus] -- PrometheusMetricsSink
     [otel]       -- OtelMetricsSink
@@ -50,8 +55,30 @@ _LAZY: dict[str, str] = {
     # dependency-free placeholders for the model seams
     "KeywordIntentClassifier": "heuristics",
     "GazetteerEntityRecognizer": "heuristics",
+    # LangGraph nodes: stdlib only, despite the framework name
+    "GUARDRAIL_KEY": "langgraph",
+    "approval_node": "langgraph",
+    "guard_message_stream": "langgraph",
+    "GuardrailState": "langgraph",
+    "guard_input_node": "langgraph",
+    "guard_output_node": "langgraph",
+    "guard_retrieval_node": "langgraph",
+    "guard_tool_calls_node": "langgraph",
+    "guard_tool_results_node": "langgraph",
+    "guardrail_record": "langgraph",
+    "guardrail_router": "langgraph",
+    "refusal_node": "langgraph",
+    "thread_session_id": "langgraph",
     # optional third-party
     "guardrail_middleware": "fastapi",
+    "GuardedRetriever": "langchain",
+    "config_session_id": "langchain",
+    "guard_input": "langchain",
+    "guard_output": "langchain",
+    "guard_output_stream": "langchain",
+    "guard_retrieval": "langchain",
+    "guard_tool": "langchain",
+    "guarded_tools": "langchain",
     "RedisCounterStore": "redis_backends",
     "FallbackCounterStore": "redis_backends",
     "PrometheusMetricsSink": "prometheus_metrics",
@@ -82,6 +109,21 @@ if TYPE_CHECKING:  # give type checkers the real symbols without a runtime cost
         verify_chain,
     )
     from .heuristics import GazetteerEntityRecognizer, KeywordIntentClassifier  # noqa: F401
+    from .langgraph import (  # noqa: F401
+        GUARDRAIL_KEY,
+        GuardrailState,
+        approval_node,
+        guard_message_stream,
+        guard_input_node,
+        guard_output_node,
+        guard_retrieval_node,
+        guard_tool_calls_node,
+        guard_tool_results_node,
+        guardrail_record,
+        guardrail_router,
+        refusal_node,
+        thread_session_id,
+    )
     from .http_adapters import (  # noqa: F401
         HttpEntityRecognizer,
         HttpError,

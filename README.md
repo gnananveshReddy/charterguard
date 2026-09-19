@@ -29,6 +29,8 @@ Copy `src/agent_guardrails` into your project, or install the package:
 ```bash
 pip install -e .                 # core + every stdlib adapter, no dependencies
 pip install -e ".[fastapi]"      # ASGI middleware
+pip install -e ".[langchain]"    # LangChain runnables, guarded tools + retriever
+pip install -e ".[langgraph]"    # LangGraph nodes (the adapter needs no import)
 pip install -e ".[redis]"        # session ceilings that hold across hosts
 pip install -e ".[prometheus]"   # or .[otel] -- metrics egress
 pip install -e ".[spacy]"        # or .[presidio] -- free-text PII (names)
@@ -122,6 +124,52 @@ handlers can log FLAG outcomes during a phased rollout.
 Construction is cheap (~150 us) and compiled rule sets are shared process-wide,
 so building a pipeline per request in a dependency is fine. Scanning is pure and
 thread-safe; only the session ledger holds mutable state, behind a lock.
+
+## LangChain and LangGraph
+
+Both frameworks are supported, and the guard decisions are shared between them,
+so a graph and a chain quarantine on the same rules and emit the same audit rows.
+
+```python
+# LangChain: guards compose with `|`
+from agent_guardrails.integrations.langchain import guard_input, guard_output
+chain = guard_input(pipeline) | prompt | model | guard_output(pipeline)
+
+# LangGraph: guards are nodes, and the router enforces
+from agent_guardrails.integrations.langgraph import (
+    guard_input_node, guardrail_router, refusal_node,
+)
+g.add_node("guard_in", guard_input_node(pipeline))
+g.add_conditional_edges("guard_in", guardrail_router(ok="model", blocked="refuse"))
+```
+
+Streaming needs the streaming guard, not `guard_output`: a `RunnableLambda`
+buffers the whole response before it can return, so a streamed chain silently
+loses streaming and gets no incremental enforcement. Use
+`guard_output_stream` (LangChain) or `guard_message_stream` (LangGraph); both
+enforce as tokens arrive via a hold-back window, so a secret split across two
+chunks is caught before any of it is emitted.
+
+Blocked actions do not have to dead-end. `approval_node` converts a block into a
+durable LangGraph `interrupt()`, so an irreversible action can be escalated to a
+human reviewer and resumed with `Command(resume=...)`. It fails closed: an
+unrecognised resume value is a rejection.
+
+The LangGraph adapter imports **no third-party package**: nodes are plain
+callables over state, so they work across langgraph versions and are tested with
+the framework absent. Guards write a JSON-serialisable record to state (a
+`Verdict` in state would break checkpointers) and the router decides, which lets
+you ship in observe-only mode first.
+
+Two contract details the adapters get right, and hand-rolled versions usually do
+not: a blocked tool call still answers *every* `tool_call_id` (a stranded id is a
+provider 400 on the next turn), and a quarantined tool result is neutralised
+in place rather than deleted, without refusing the turn. Poisoned *retrieved
+documents* are dropped instead, since they carry no id awaiting an answer.
+
+See [docs/ADAPTERS.md](docs/ADAPTERS.md#langgraph) for the full wiring, the
+`safe_output`-versus-history split, and the guarded retriever and tool wrappers.
+
 
 ## Untrusted content and envelopes
 
@@ -222,12 +270,12 @@ pytest                        # same tests, if pytest is installed
 python benchmarks/bench.py
 ```
 
-166 tests cover normalization and offset mapping, injection and jailbreak
+269 tests cover normalization and offset mapping, injection and jailbreak
 detection, encoded payloads, secret and PII precision (Luhn, Verhoeff, entropy
 gates), rule shadowing, scope enforcement, grounding, volume ceilings, prefilter
 equivalence, model-tier escalation bands and sampling, the multilingual pack, the
-NER seam, streaming enforcement, audit-chain integrity, metrics, and the pipeline
-itself.
+NER seam, streaming enforcement, audit-chain integrity, metrics, the LangChain and
+LangGraph adapters, and the pipeline itself.
 
 Two suites are worth calling out because they find real bugs rather than
 confirming intent:
@@ -236,6 +284,13 @@ confirming intent:
   spans always index the original text, normalization is idempotent, and no rule
   backtracks catastrophically. This caught an O(n^2) banner pattern and a
   case-folding order bug that made normalization non-idempotent.
+* `test_langchain_langgraph.py` -- runs with neither framework installed, by
+  duck-typing messages and documents. Asserts the contract properties that break
+  agents in production: every `tool_call_id` gets a result even when a call is
+  refused, guarded state survives `json.dumps` for checkpointers, and an
+  in-place message rewrite refuses to run without an `id`. Streaming coverage
+  asserts a secret split across chunks never reaches the user at any coalescing
+  setting, and that human approval fails closed on an unrecognised resume value.
 * `test_corpus.py` -- recall per attack family plus a false-positive budget on
   benign text. This caught five entirely undetected families (interrogative
   prompt leaks, "enable developer mode", forged chat-template tokens, URL

@@ -120,19 +120,6 @@ class JsonlAuditSink:
     def head(self) -> str:
         return self._head
 
-    def __enter__(self) -> "JsonlAuditSink":
-        return self
-
-    def __exit__(self, *exc_info: object) -> None:
-        self.close()
-
-    def __del__(self) -> None:
-        # Safety net only: callers should use `close()` or a `with` block.
-        try:
-            self.close()
-        except Exception:
-            pass
-
     def _recover_head(self) -> str:
         if not self._path.exists():
             return GENESIS_HASH
@@ -189,6 +176,18 @@ class JsonlAuditSink:
     def close(self) -> None:
         with self._lock:
             self._fh.close()
+
+    def __enter__(self) -> "JsonlAuditSink":
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def records(self) -> Iterable[dict[str, Any]]:
         with self._path.open("r", encoding="utf-8") as fh:

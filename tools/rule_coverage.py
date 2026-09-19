@@ -33,7 +33,6 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from agent_guardrails import GuardrailPipeline  # noqa: E402
 from agent_guardrails.patterns import RULES  # noqa: E402
-from agent_guardrails.types import Layer  # noqa: E402
 
 CORPORA = (
     ROOT / "tests" / "corpus" / "attacks.jsonl",

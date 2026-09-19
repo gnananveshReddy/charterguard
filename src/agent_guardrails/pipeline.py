@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from .config import GuardrailConfig
 from .detectors import (

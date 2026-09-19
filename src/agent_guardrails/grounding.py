@@ -17,7 +17,7 @@ from typing import Iterable, Sequence
 
 from .config import GuardrailConfig
 from .policy import decide
-from .types import Action, Category, Finding, Layer, Severity, Timer, Verdict
+from .types import Category, Finding, Layer, Severity, Timer, Verdict
 
 _CITATION = re.compile(r"\[{1,2}([a-z0-9_.:#\-]{1,64})\]{1,2}", re.IGNORECASE)
 _SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(\[])|\n+")

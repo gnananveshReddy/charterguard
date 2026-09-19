@@ -52,7 +52,7 @@ from .ledger import CounterStore, InMemoryCounterStore, SessionLedger
 from .normalize import NormalizedText, normalize
 from .observability import InMemoryMetrics, MetricsSink, NullMetrics
 from .pii import Entity, EntityDetector, EntityRecognizer
-from .streaming import StreamChunk, StreamGuard
+from .streaming import AsyncStreamGuard, StreamChunk, StreamGuard
 from .patterns import RULES, Rule, rules_for
 from .pipeline import GuardrailPipeline, UntrustedResult
 from .policy import Decision, category_scores, decide, noisy_or
@@ -70,7 +70,7 @@ from .types import (
     Verdict,
 )
 
-__version__ = "1.3.0"
+__version__ = "1.6.0"
 
 __all__ = [
     "__version__",
@@ -126,6 +126,7 @@ __all__ = [
     "NormalizedText",
     # streaming, observability, ledger backends
     "StreamGuard",
+    "AsyncStreamGuard",
     "StreamChunk",
     "MetricsSink",
     "NullMetrics",
@@ -162,6 +163,11 @@ __all__ = [
 # names. Measured: eager import cost 1398 ms and left numpy in sys.modules, lazy
 # import costs 3 ms and does not.
 _LAZY = {
+    # operations tier: rule health and counterfactual policy evaluation
+    "RuleHealth": "ruleops",
+    "RuleStat": "ruleops",
+    "ShadowPolicy": "shadow",
+    "ShadowDelta": "shadow",
     "TextEmbedder": "semantic",
     "HashingEmbedder": "semantic",
     "PrototypeBank": "semantic",

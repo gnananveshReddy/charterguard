@@ -9,7 +9,7 @@ from dataclasses import replace
 from typing import Any, Callable, Sequence
 
 try:
-    from fastapi import HTTPException, Request, status
+    from fastapi import Request, status
     from fastapi.responses import JSONResponse
 except ImportError as exc:  # pragma: no cover
     raise ImportError("agent_guardrails.integrations.fastapi requires fastapi") from exc

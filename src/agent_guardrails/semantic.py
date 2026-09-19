@@ -40,15 +40,13 @@ sentence encoder is what makes this tier semantic.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import math
 import re
 from array import array
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Mapping, Protocol, Sequence
 
-from .config import GuardrailConfig
 from .scanner import ResultCache, content_key
 from .types import Category, Layer
 

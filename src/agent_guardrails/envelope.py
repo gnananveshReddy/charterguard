@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .types import Category, Finding, Severity
 

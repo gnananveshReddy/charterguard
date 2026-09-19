@@ -114,6 +114,12 @@ Before enabling enforcement on production traffic:
       that silently stops firing looks exactly like a quiet week.
 - [ ] Redaction placeholders are reviewed: they carry a digest, not the value.
 - [ ] `python tests/run_tests.py` and `python tools/rule_coverage.py` pass in CI.
+- [ ] Streamed responses go through `guard_output_stream` /
+      `guard_message_stream`, not `guard_output` -- a whole-response guard on a
+      stream observes rather than enforces, and buffers the response besides.
+- [ ] Irreversible tool calls require a human: wire `approval_node` (LangGraph)
+      or an equivalent gate. Guardrails lower the probability of a bad action;
+      only approval and least privilege bound its cost.
 - [ ] An external attack corpus has been run via `GUARDRAILS_ATTACK_CORPUS`.
 - [ ] The rule pack has an owner and a review cadence. Detection decays.
 

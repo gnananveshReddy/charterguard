@@ -13,8 +13,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
-from typing import Awaitable, Callable, Protocol, Sequence
+from dataclasses import dataclass
+from typing import Protocol, Sequence
 
 from .config import GuardrailConfig
 from .normalize import normalize
