@@ -89,6 +89,12 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
   unknown ones (`(?P=`, conditionals) fall back to a full scan.
 
 ### Security
+- **Short-circuit redaction bypass.** With default modes an injection phrase is
+  CRITICAL but only flags; the scan stopped there, so a secret or PII value in the
+  same text was never matched. `check_output` returned FLAG with the key
+  unredacted, and `check_input` let a credential through. Short-circuiting now
+  only ends the scan when the CRITICAL finding already decides a BLOCK; otherwise
+  every detector re-runs to completion for BLOCK-mode and redaction categories.
 - HTTP adapters (`HttpModelScorer`, `OpenAIModerationScorer`,
   `HttpIntentClassifier`, `HttpEntityRecognizer`) now accept only `https`, or
   `http` with `allow_insecure_http=True`. Previously the opt-in admitted any
