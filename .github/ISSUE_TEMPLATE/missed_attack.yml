@@ -1,0 +1,53 @@
+name: Missed attack (false negative)
+description: An injection, jailbreak or leak that charterguard allows.
+labels: ["false-negative", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Is this a bypass of an existing rule?** If the input defeats a rule that
+        claims to cover it (an encoding, homoglyph or spacing trick, say), report it
+        **privately** via [SECURITY.md](../blob/main/SECURITY.md) instead.
+        Public issues are for coverage gaps such as new phrasings, languages or families.
+  - type: textarea
+    id: input
+    attributes:
+      label: Input
+      description: The smallest text that reproduces it. Remove anything sensitive.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Layer
+      options: [check_input, inspect_untrusted, inspect_tool_output, check_output, check_tool_call]
+    validations:
+      required: true
+  - type: dropdown
+    id: preset
+    attributes:
+      label: Config
+      options: [default, strict, report_only, custom policy file]
+    validations:
+      required: true
+  - type: textarea
+    id: verdict
+    attributes:
+      label: Verdict received
+      description: "`charterguard scan --json` output, or the Verdict's action and findings."
+      render: json
+  - type: input
+    id: expected
+    attributes:
+      label: Expected
+      placeholder: "block / flag, and the category (injection, jailbreak, ...)"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "charterguard version"
+    validations:
+      required: true

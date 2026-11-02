@@ -12,6 +12,11 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Project hygiene: CONTRIBUTING, CODE_OF_CONDUCT (Contributor Covenant 2.1),
+  issue templates for missed attacks / false positives / bugs / features, a PR
+  template, Dependabot, CodeQL, OpenSSF Scorecard, and a release workflow with
+  PyPI trusted publishing (tag must match the version; wheel smoke-tested).
+  SECURITY.md now points to GitHub private vulnerability reporting.
 - OpenAI Agents SDK guardrails (input, output, tool input, tool output; input runs
   blocking) and Claude Agent SDK hooks (UserPromptSubmit, PreToolUse, PostToolUse,
   per-session ceilings). Extras `openai-agents`, `claude-agent-sdk`; both run in CI.
