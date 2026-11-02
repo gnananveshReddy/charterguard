@@ -83,18 +83,21 @@ def _content_text(content: object) -> str:
 _TRUSTED_ROLES = frozenset({"system", "developer"})
 
 
+# Bookkeeping fields the SDK sets itself; everything else in an untrusted item
+# is scanned. A denylist, not an allowlist: a new item type with a new field
+# name (results, error, action, queries, ...) is covered by default.
+_METADATA_KEYS = frozenset({"id", "call_id", "status", "type", "role"})
+
+
 def _item_text(item: Mapping[str, Any]) -> str:
-    """Every model-readable string an input item carries."""
-    parts: list[str] = []
-    for key in ("content", "output", "arguments", "summary", "text", "result"):
-        value = item.get(key)
-        if value is None:
-            continue
-        text = _content_text(value) if not isinstance(value, Mapping) else ""
-        if not text:
-            text = json.dumps(value, ensure_ascii=False, default=str)
-        parts.append(text)
-    return "\n".join(p for p in parts if p)
+    """Every model-readable string an untrusted input item carries."""
+    payload = {k: v for k, v in item.items() if k not in _METADATA_KEYS}
+    if not payload:
+        return ""
+    # Plain text first, so a scan sees "content" as prose rather than JSON.
+    prose = _content_text(payload.get("content")) if "content" in payload else ""
+    rest = json.dumps(payload, ensure_ascii=False, default=str)
+    return f"{prose}\n{rest}" if prose else rest
 
 
 def input_text(user_input: str | Sequence[Any]) -> tuple[str, list[str]]:
