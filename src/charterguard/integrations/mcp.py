@@ -325,7 +325,9 @@ def _block_text(block: object) -> tuple[str | None, str | None]:
         return ("[link] " + " | ".join(parts), None) if parts else (None, "empty resource link")
     if kind in _MEDIA_TYPES:
         return None, None  # handled by the caller's allow_media choice
-    return None, f"unsupported block type {kind!r}"
+    # Fixed text only: the block type is attacker-controlled and the note is
+    # model-visible outside the envelope.
+    return None, "unsupported block type"
 
 
 def guard_mcp_result(
@@ -375,7 +377,7 @@ def guard_mcp_result(
             if allow_media and data and mime:
                 media.append({"type": block["type"], "data": data, "mimeType": mime})
             else:
-                dropped.append(f"{block['type']} not forwarded")
+                dropped.append("image not forwarded" if block["type"] == "image" else "audio not forwarded")
     structured = result.get("structuredContent")
     if structured is not None:
         parts.append("[structured]\n" + json.dumps(structured, ensure_ascii=False, default=str))

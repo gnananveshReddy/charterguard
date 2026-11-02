@@ -223,7 +223,12 @@ def test_unknown_malformed_and_binary_blocks_are_dropped():
     assert ATTACK not in json.dumps(guarded)
     assert len(guarded["content"]) == 1
     dropped = guarded["_meta"]["charterguard"]["dropped"]
-    assert {"unsupported block type 'hologram'", "malformed text block", "malformed block", "binary resource"} <= set(dropped)
+    assert {"unsupported block type", "malformed text block", "malformed block", "binary resource"} <= set(dropped)
+
+
+def test_attacker_controlled_block_type_is_never_echoed():
+    guarded = guard_mcp_result(strict(), {"content": [{"type": ATTACK}]}, tool_name="t")
+    assert ATTACK not in json.dumps(guarded)
 
 
 def test_media_is_dropped_unless_allowed_and_never_when_quarantined():
