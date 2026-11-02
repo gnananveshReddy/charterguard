@@ -325,3 +325,17 @@ def test_input_text_is_not_hidden_by_json_escaping():
         _, untrusted = input_text([item])
         assert len(untrusted) == 1 and attack in untrusted[0]
         assert p.inspect_untrusted(untrusted[0], kind="tool_result").quarantined
+
+
+async def test_post_tool_use_redaction_does_not_depend_on_the_envelope_nonce():
+    # The final rescan used to read the enveloped output. Its nonce is random
+    # hex, and ~1 run in 20 a digit/hex run in it matched a numeric PII shape
+    # (phone, IBAN), so the hook fell back to the constant at random.
+    for i in range(200):
+        hook = post_tool_use_hook(GuardrailPipeline())
+        for response in ({"stdout": SECRET, "stderr": "", "interrupted": False},
+                         [{"type": "text", "text": SECRET}, {"type": "text", "text": "x"}]):
+            out = await hook({"tool_name": "mcp__x__y", "tool_response": response, "session_id": f"s{i}"}, "t", {})
+            replaced = out["hookSpecificOutput"]["updatedToolOutput"]
+            assert type(replaced) is type(response), (i, json.dumps(out)[:300])
+            assert "AKIAIOSFODNN7EXAMPLE" not in json.dumps(out)
