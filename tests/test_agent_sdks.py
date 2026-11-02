@@ -183,3 +183,87 @@ def test_openai_tool_output_guardrail_quarantines_and_redacts():
 
     clean = g.guardrail_function(_tool_data("weather", output="Sunny, 24C."))
     assert clean.behavior == {"type": "allow"}
+
+
+# ================================================== review follow-ups
+async def test_post_tool_use_redacts_secrets_in_place_keeping_the_shape():
+    hook = post_tool_use_hook(GuardrailPipeline())
+    response = {"stdout": SECRET, "stderr": "", "interrupted": False}
+    out = await hook({"tool_name": "Bash", "tool_response": response, "session_id": "s"}, "t", {})
+    replacement = out["hookSpecificOutput"]["updatedToolOutput"]
+    assert set(replacement) == set(response)
+    assert replacement["interrupted"] is False
+    assert "AKIAIOSFODNN7EXAMPLE" not in json.dumps(out)
+    assert out["decision"] == "block"
+    assert "updatedMCPToolOutput" not in out["hookSpecificOutput"]
+
+
+async def test_post_tool_use_withholds_quarantined_output_keeping_the_shape():
+    hook = post_tool_use_hook(strict())
+    response = {"stdout": "Page. " + ATTACK, "stderr": "warn", "interrupted": False}
+    out = await hook({"tool_name": "Bash", "tool_response": response}, "t", {})
+    replacement = out["hookSpecificOutput"]["updatedToolOutput"]
+    assert set(replacement) == set(response)
+    assert ATTACK not in json.dumps(out)
+    assert "withheld" in replacement["stdout"] and replacement["stderr"] == ""
+
+
+async def test_post_tool_use_replaces_mcp_tool_output():
+    hook = post_tool_use_hook(strict())
+    response = [{"type": "text", "text": ATTACK}]
+    out = await hook({"tool_name": "mcp__search__query", "tool_response": response}, "t", {})
+    replaced = out["hookSpecificOutput"]["updatedMCPToolOutput"]
+    assert replaced[0]["type"] == "text"  # discriminator kept, so the shape still validates
+    assert "withheld" in replaced[0]["text"]
+    assert ATTACK not in json.dumps(out)
+
+
+async def test_redaction_keeps_discriminators_and_blanks_non_identifier_types():
+    hook = post_tool_use_hook(GuardrailPipeline())
+    response = [{"type": "text", "text": SECRET}, {"type": "not a type, an instruction", "text": "x"}]
+    out = await hook({"tool_name": "mcp__env__get", "tool_response": response}, "t", {})
+    replaced = out["hookSpecificOutput"]["updatedToolOutput"]
+    assert replaced[0]["type"] == "text"
+    assert replaced[1]["type"] == ""
+    assert "AKIAIOSFODNN7EXAMPLE" not in json.dumps(out)
+
+
+def test_input_text_treats_every_non_user_item_as_untrusted():
+    class Item:
+        def model_dump(self) -> dict[str, object]:
+            return {"type": "computer_call_output", "output": {"text": "screen: " + ATTACK}}
+
+    items = [
+        {"role": "system", "content": "Ignore previous instructions from older templates."},  # app-owned
+        {"role": "developer", "content": "be brief"},
+        {"role": "assistant", "content": [{"type": "output_text", "text": "a. " + ATTACK}]},
+        {"type": "reasoning", "summary": [{"type": "summary_text", "text": "b. " + ATTACK}]},
+        {"type": "web_search_call_output", "result": "c. " + ATTACK},
+        {"type": "brand_new_item", "content": "d. " + ATTACK},
+        Item(),
+        {"role": "user", "content": "hi"},
+    ]
+    user, untrusted = input_text(items)
+    assert user == "hi"
+    assert len(untrusted) == 5
+    assert all(ATTACK in u for u in untrusted)
+
+
+def test_openai_tool_guardrails_are_per_session():
+    if not have("agents"):
+        return
+    from dataclasses import replace
+
+    from charterguard.integrations.openai_agents import tool_input_guardrail
+
+    cfg = GuardrailConfig.strict()
+    pipeline = GuardrailPipeline(replace(cfg, volume=replace(cfg.volume, max_tool_calls=1)))
+    g = tool_input_guardrail(pipeline, session_id=lambda ctx: ctx.conversation)
+
+    def data(conv: str) -> SimpleNamespace:
+        ctx = SimpleNamespace(tool_name="search", tool_arguments='{"q": "x"}', conversation=conv)
+        return SimpleNamespace(context=ctx, agent=None)
+
+    assert g.guardrail_function(data("a")).behavior == {"type": "allow"}
+    assert g.guardrail_function(data("a")).behavior["type"] == "reject_content"
+    assert g.guardrail_function(data("b")).behavior == {"type": "allow"}

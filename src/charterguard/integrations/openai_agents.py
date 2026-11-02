@@ -80,11 +80,31 @@ def _content_text(content: object) -> str:
     return ""
 
 
+_TRUSTED_ROLES = frozenset({"system", "developer"})
+
+
+def _item_text(item: Mapping[str, Any]) -> str:
+    """Every model-readable string an input item carries."""
+    parts: list[str] = []
+    for key in ("content", "output", "arguments", "summary", "text", "result"):
+        value = item.get(key)
+        if value is None:
+            continue
+        text = _content_text(value) if not isinstance(value, Mapping) else ""
+        if not text:
+            text = json.dumps(value, ensure_ascii=False, default=str)
+        parts.append(text)
+    return "\n".join(p for p in parts if p)
+
+
 def input_text(user_input: str | Sequence[Any]) -> tuple[str, list[str]]:
     """Split an Agents SDK run input into (user text, untrusted texts).
 
-    User/system/developer messages are the turn being checked; tool results
-    (``function_call_output``) replayed in the input list are untrusted content.
+    User messages are the turn checked with `check_input`. System and developer
+    messages are the application's own instructions and are not scanned.
+    **Everything else** -- assistant messages, tool and function call outputs,
+    computer/web/file-search results, reasoning summaries, unknown item types,
+    and non-dict items -- may carry injected text and is returned as untrusted.
     """
     if isinstance(user_input, str):
         return user_input, []
@@ -92,12 +112,19 @@ def input_text(user_input: str | Sequence[Any]) -> tuple[str, list[str]]:
     untrusted: list[str] = []
     for item in user_input:
         if not isinstance(item, Mapping):
-            continue
-        if item.get("type") == "function_call_output":
-            output = item.get("output")
-            untrusted.append(output if isinstance(output, str) else json.dumps(output, default=str))
-        elif item.get("role") == "user":
+            dump = getattr(item, "model_dump", None)
+            item = dump() if callable(dump) else {"content": str(item)}
+            if not isinstance(item, Mapping):
+                continue
+        role = item.get("role")
+        if role == "user" and item.get("type") in (None, "message"):
             user_parts.append(_content_text(item.get("content")))
+        elif role in _TRUSTED_ROLES and item.get("type") in (None, "message"):
+            continue
+        else:
+            text = _item_text(item)
+            if text:
+                untrusted.append(text)
     return "\n".join(p for p in user_parts if p), untrusted
 
 
@@ -164,9 +191,15 @@ def output_guardrail(
 
 
 # ------------------------------------------------------------- tool level
-def tool_input_guardrail(pipeline: GuardrailPipeline, *, name: str = "charterguard_tool_input") -> Any:
+def tool_input_guardrail(
+    pipeline: GuardrailPipeline,
+    *,
+    name: str = "charterguard_tool_input",
+    session_id: Callable[[Any], str] | None = None,
+) -> Any:
     """Reject tool calls the scope charter forbids or whose arguments carry
-    command-injection / exfiltration payloads."""
+    command-injection / exfiltration payloads. ``session_id`` receives the
+    SDK's ToolContext; pass it so tool-call ceilings are per conversation."""
     agents = _agents()
 
     def check(data: Any) -> Any:
@@ -176,7 +209,9 @@ def tool_input_guardrail(pipeline: GuardrailPipeline, *, name: str = "chartergua
             arguments: object = json.loads(raw)
         except ValueError:
             arguments = raw
-        verdict = pipeline.check_tool_call(str(getattr(ctx, "tool_name", "tool")), arguments)
+        verdict = pipeline.check_tool_call(
+            str(getattr(ctx, "tool_name", "tool")), arguments, session_id=_session(ctx, session_id)
+        )
         if verdict.blocked:
             return agents.ToolGuardrailFunctionOutput.reject_content(
                 f"Tool call blocked by policy ({verdict.policy_id}).", output_info=_summary(verdict)
@@ -186,14 +221,24 @@ def tool_input_guardrail(pipeline: GuardrailPipeline, *, name: str = "chartergua
     return agents.ToolInputGuardrail(guardrail_function=check, name=name)
 
 
-def tool_output_guardrail(pipeline: GuardrailPipeline, *, name: str = "charterguard_tool_output") -> Any:
-    """Treat tool output as untrusted: quarantine injections, redact secrets."""
+def tool_output_guardrail(
+    pipeline: GuardrailPipeline,
+    *,
+    name: str = "charterguard_tool_output",
+    session_id: Callable[[Any], str] | None = None,
+) -> Any:
+    """Treat tool output as untrusted: quarantine injections, redact secrets.
+    ``session_id`` receives the SDK's ToolContext."""
     agents = _agents()
 
     def check(data: Any) -> Any:
         output = data.output
         text = output if isinstance(output, str) else _output_text(output)
-        result = pipeline.inspect_tool_output(text, tool_name=str(getattr(data.context, "tool_name", "tool")))
+        result = pipeline.inspect_tool_output(
+            text,
+            tool_name=str(getattr(data.context, "tool_name", "tool")),
+            session_id=_session(data.context, session_id),
+        )
         info = {"quarantined": result.quarantined, **_summary(result.verdict)}
         redactions = int(result.verdict.meta.get("redaction_count", 0))
         if result.quarantined or redactions:

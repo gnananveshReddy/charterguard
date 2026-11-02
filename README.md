@@ -345,9 +345,11 @@ options = ClaudeAgentOptions(hooks=claude_agent_hooks(pipeline))
 ```
 
 `UserPromptSubmit` blocks attacks before the model sees them, `PreToolUse` denies
-forbidden or command-injecting tool calls, and `PostToolUse` flags quarantined tool
-output. A post-tool hook cannot erase output that already exists, so for tools you
-control, guard inside the tool or serve it through `charterguard mcp`.
+forbidden or command-injecting tool calls, and `PostToolUse` replaces quarantined
+output, or output carrying secrets or PII, with a same-shape redacted or withheld copy
+(`updatedToolOutput`). The SDK keeps the original output if a replacement doesn't
+match the tool's schema, so for tools you control, guarding inside the tool (or
+serving it through `charterguard mcp`) is still the strongest option.
 
 ## MCP
 
