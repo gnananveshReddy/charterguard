@@ -9,22 +9,58 @@ The distinction is only drawn on the user's own turn (``Layer.INPUT``). In
 retrieved documents and tool output, quoting is a free evasion -- an attacker
 controls the quotes -- so untrusted layers are never dampened.
 
-Even on input, dampening is deliberately narrow:
+Even on input, dampening must not become a wrapper an attacker can put around a
+real payload ("Do this: '<payload>' (example attack)"). It applies only when
+the quote *is* the attack phrase and nothing more, which leaves nothing
+actionable to smuggle:
 
-* only injection and jailbreak findings, and only those lying entirely inside
-  a quoted span, are lowered -- to MEDIUM, which flags rather than allows;
-* the text outside the quotes must read as discussion ("explain", "how does",
-  "example", "attack", ...);
-* the text *outside* the quotes is re-scanned from scratch with the quoted
-  spans blanked. The rule detector stops at its first CRITICAL match, so
-  without the re-scan a harmless quoted phrase placed first could shadow a real
-  unquoted attack placed after it.
+* exactly one quoted span holds injection/jailbreak findings, and it is short;
+* the matched phrase covers most of that quote -- no extra instructions ride
+  along inside it -- and only one distinct rule fires inside it, so a quote
+  carrying two techniques is never softened;
+* the discussion cue sits right next to the quote ("explain 'X'", "what does
+  'X' mean"), not anywhere in the turn;
+* nothing outside the quote tells the model to act on it ("do this",
+  "follow", "execute", "treat it as");
+* the quote is not most of the turn.
+
+Findings that qualify are lowered to MEDIUM, which flags rather than allows.
+The text *outside* the quotes is re-scanned from scratch with the quote
+blanked: the rule detector stops at its first CRITICAL match, so without the
+re-scan a harmless quoted phrase placed first could shadow a real unquoted
+attack placed after it.
 """
 from __future__ import annotations
 
 import re
 
-__all__ = ["quoted_spans", "mask_spans", "keep_only_spans", "reads_as_discussion"]
+__all__ = [
+    "quoted_spans",
+    "mask_spans",
+    "keep_only_spans",
+    "reads_as_discussion",
+    "cue_beside",
+    "directs_at_quote",
+    "MAX_QUOTE_CHARS",
+    "MIN_PHRASE_COVERAGE",
+    "MAX_TURN_SHARE",
+]
+
+# A quoted *mention* is a phrase, not a paragraph.
+MAX_QUOTE_CHARS = 120
+# Share of the quote's content that the matched phrase must cover.
+MIN_PHRASE_COVERAGE = 0.6
+# A turn that is mostly one quote is not a discussion of it.
+MAX_TURN_SHARE = 0.7
+# How far from the quote a discussion cue may sit.
+_CUE_REACH = 48
+
+_DIRECTIVE = re.compile(
+    r"\b(?:do\s+(?:this|that|it|exactly|the\s+following|as\s+(?:it\s+)?says)|follow|obey|execute|"
+    r"run\s+(?:this|it|that)|apply|comply|act\s+on|carry\s+out|perform|treat\s+(?:this|it|that)\s+as|"
+    r"take\s+(?:this|it)\s+(?:as|literally)|then\s+do|now\s+do|respond\s+as\s+if)\b",
+    re.IGNORECASE,
+)
 
 _QUOTE_CHARS = frozenset("\"'`“‘")
 
@@ -80,3 +116,14 @@ def keep_only_spans(text: str, spans: list[tuple[int, int]]) -> str:
 
 def reads_as_discussion(unquoted: str) -> bool:
     return _DISCUSSION.search(unquoted) is not None
+
+
+def cue_beside(text: str, span: tuple[int, int]) -> bool:
+    """A discussion cue within a short reach of the quote, on either side."""
+    s, e = span
+    return reads_as_discussion(text[max(0, s - _CUE_REACH) : s] + " " + text[e : e + _CUE_REACH])
+
+
+def directs_at_quote(unquoted: str) -> bool:
+    """The text around the quote tells the model to act on it."""
+    return _DIRECTIVE.search(unquoted) is not None
