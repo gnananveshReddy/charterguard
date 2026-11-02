@@ -51,10 +51,8 @@ from .grounding import GroundingChecker
 from .ledger import SessionLedger
 from .mentions import (
     MAX_QUOTE_CHARS,
-    MAX_TURN_SHARE,
     MIN_PHRASE_COVERAGE,
-    cue_beside,
-    directs_at_quote,
+    frame_is_a_question,
     keep_only_spans,
     mask_spans,
     quoted_spans,
@@ -202,29 +200,35 @@ class GuardrailPipeline:
         if len(holders) != 1:
             return findings
         ((s, e),) = holders
+        for f in findings:
+            overlaps = f.start < e and f.end > s
+            contained = s <= f.start and f.end <= e
+            # A finding straddling the quote boundary, or a non-dampenable
+            # finding touching the quote, means the quote is not a clean mention.
+            if overlaps and (not contained or f.category not in _DAMPENABLE):
+                return findings
         inner_len = (e - s) - 2  # quote characters excluded
-        if not 0 < inner_len <= MAX_QUOTE_CHARS or (e - s) > MAX_TURN_SHARE * len(text.strip()):
+        if not 0 < inner_len <= MAX_QUOTE_CHARS:
             return findings
-        unquoted = mask_spans(text, [(s, e)])
-        if not cue_beside(text, (s, e)) or directs_at_quote(unquoted):
+        # Allowlist, not denylist: everything outside the quote must be one of
+        # a few fixed question shapes. Any other clause keeps the verdict.
+        if not frame_is_a_question(text, (s, e)):
             return findings
 
-        # Thorough scan of the quote alone -- every rule, no short-circuit --
-        # so a second technique hidden in the quote cannot go uncounted.
+        # Thorough scan of the quote alone with every detector this pipeline
+        # runs (including custom RuleDetectors) plus the full default rule set,
+        # never short-circuiting, so a second technique cannot go uncounted.
         budget = self.config.budget
         nt_quote = normalize(keep_only_spans(text, [(s, e)]), max_chars=budget.max_chars)
         if self._all_input_rules is None:
             self._all_input_rules = compile_rules(rules_for(layer=Layer.INPUT))
         matches = self._all_input_rules.scan(nt_quote.text, limit=64)
-        others = [
-            f for d in self._detectors if not isinstance(d, RuleDetector)
-            for f in d.scan(nt_quote, layer, self.config)
-        ]
+        detected = [f for d in self._detectors for f in d.scan(nt_quote, layer, self.config)]
         if any(m.rule.category not in _DAMPENABLE for m in matches) or any(
-            f.category not in _DAMPENABLE for f in others
+            f.category not in _DAMPENABLE for f in detected
         ):
             return findings
-        if len({m.rule.id for m in matches} | {f.rule_id for f in others}) != 1:
+        if len({m.rule.id for m in matches} | {f.rule_id for f in detected}) != 1:
             return findings
         covered: set[int] = set()
         for m in matches:
@@ -235,22 +239,28 @@ class GuardrailPipeline:
 
         # Eligible. The text outside the quote is re-scanned from scratch: the
         # rule detector stops at its first CRITICAL, so the original findings
-        # could be hiding a real attack placed after the quoted decoy.
+        # could be hiding something placed after the quoted phrase. Original
+        # findings outside the quote are kept as well -- nothing is dropped.
         outside = self._run_detectors(
-            normalize(unquoted, max_chars=budget.max_chars, tail_chars=budget.tail_chars), layer
+            normalize(mask_spans(text, [(s, e)]), max_chars=budget.max_chars, tail_chars=budget.tail_chars),
+            layer,
         )
         medium = Severity.MEDIUM
-        softened = [
-            replace(
-                f,
-                severity=medium,
-                score=min(f.score, severity_score(medium)),
-                description=f"{f.description} (quoted in a discussion)",
-            )
-            for f in findings
-            if s <= f.start and f.end <= e and f.category in _DAMPENABLE
-        ]
-        return outside + softened
+        softened: list[Finding] = []
+        kept: list[Finding] = []
+        for f in findings:
+            if s <= f.start and f.end <= e and f.category in _DAMPENABLE:
+                softened.append(
+                    replace(
+                        f,
+                        severity=min(f.severity, medium),
+                        score=min(f.score, severity_score(medium)),
+                        description=f"{f.description} (quoted in a question about it)",
+                    )
+                )
+            else:
+                kept.append(f)
+        return outside + kept + softened
 
     def _verdict(
         self,
