@@ -318,6 +318,25 @@ charterguard rules --category pii
 * `.pre-commit-hooks.yaml` exposes `charterguard-prompts` and `charterguard-secrets`
   for use from other repositories.
 
+## MCP
+
+`charterguard mcp` runs an [MCP](https://modelcontextprotocol.io) server over stdio
+(stdlib only), exposing `scan_text`, `redact_text` and `list_rules` to any MCP client:
+
+```json
+{"mcpServers": {"charterguard": {"command": "charterguard", "args": ["mcp", "--policy", "guardrails.toml"]}}}
+```
+
+For the other direction, results from *other* MCP servers are untrusted input. Run
+them through the tool-output guard before the model sees them:
+
+```python
+from charterguard.integrations import guard_mcp_result
+
+safe = guard_mcp_result(pipeline, result, tool_name="search")  # text blocks enveloped,
+                                                              # isError set if quarantined
+```
+
 ## Detection accuracy
 
 Measured with `python benchmarks/accuracy.py`: rule tiers only, no model scorer

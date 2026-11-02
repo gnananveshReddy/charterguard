@@ -1,4 +1,4 @@
-"""Command-line interface: ``charterguard scan | eval | rules | policy | version``.
+"""Command-line interface: ``charterguard scan | eval | rules | policy | mcp | version``.
 
     echo "ignore all previous instructions" | charterguard scan
     charterguard scan --layer untrusted retrieved/*.md --json
@@ -242,6 +242,12 @@ def _cmd_policy(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
     return 0
 
 
+def _cmd_mcp(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
+    from .integrations.mcp import serve_stdio
+
+    return serve_stdio(_pipeline(args), stdin=stdin, stdout=out)
+
+
 def _cmd_version(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
     out.write(f"charterguard {__version__}\n")
     return 0
@@ -288,6 +294,11 @@ def build_parser() -> argparse.ArgumentParser:
     policy = sub.add_parser("policy", help="validate a policy file and print the effective policy")
     policy.add_argument("path")
     policy.set_defaults(func=_cmd_policy)
+
+    mcp = sub.add_parser("mcp", help="run as an MCP server over stdio")
+    mcp.add_argument("--strict", action="store_true", help="use GuardrailConfig.strict()")
+    mcp.add_argument("--policy", metavar="FILE", help="TOML/JSON policy file")
+    mcp.set_defaults(func=_cmd_mcp)
 
     version = sub.add_parser("version", help="print the version")
     version.set_defaults(func=_cmd_version)

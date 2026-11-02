@@ -12,7 +12,8 @@ Dependency tiers, so you can see what a name costs before you use it:
                     StatsdMetricsSink, SqliteCounterStore, SqliteAuditSink,
                     HttpModelScorer, OpenAIModerationScorer,
                     HttpIntentClassifier, HttpEntityRecognizer,
-                    KeywordIntentClassifier, GazetteerEntityRecognizer
+                    KeywordIntentClassifier, GazetteerEntityRecognizer,
+                    McpServer, serve_stdio, guard_mcp_result
     [fastapi]    -- guardrail_middleware
     [langgraph]  -- (nodes are plain callables and need no third-party import;
                     only approval_node() needs langgraph, and only at call time
@@ -69,6 +70,10 @@ _LAZY: dict[str, str] = {
     "guardrail_router": "langgraph",
     "refusal_node": "langgraph",
     "thread_session_id": "langgraph",
+    # Model Context Protocol server + result guard (stdlib)
+    "McpServer": "mcp",
+    "serve_stdio": "mcp",
+    "guard_mcp_result": "mcp",
     # optional third-party
     "guardrail_middleware": "fastapi",
     "GuardedRetriever": "langchain",
@@ -109,6 +114,7 @@ if TYPE_CHECKING:  # give type checkers the real symbols without a runtime cost
         verify_chain,
     )
     from .heuristics import GazetteerEntityRecognizer, KeywordIntentClassifier  # noqa: F401
+    from .mcp import McpServer, guard_mcp_result, serve_stdio  # noqa: F401
     from .langgraph import (  # noqa: F401
         GUARDRAIL_KEY,
         GuardrailState,

@@ -12,6 +12,9 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- MCP: `charterguard mcp` stdio server (`scan_text`, `redact_text`, `list_rules`;
+  protocol 2024-11-05 through 2025-11-25; stdlib only) and `guard_mcp_result()`
+  to treat other MCP servers' tool results as untrusted input.
 - Policy files: `load_policy()` / `GuardrailConfig.from_file()` build a config
   from TOML or JSON with strict validation (`PolicyError` on unknown keys, wrong
   types, out-of-range or inverted thresholds). CLI `--policy FILE` and
