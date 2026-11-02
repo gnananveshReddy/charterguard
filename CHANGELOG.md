@@ -12,6 +12,9 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- `charterguard` command line (`scan`, `eval`, `rules`, `version`) with CI exit
+  codes, JSON output, `--redact`, and pre-commit hooks (`.pre-commit-hooks.yaml`).
+  Reports never echo matched text.
 - `benchmarks/accuracy.py`: precision, recall, FPR and latency on the bundled
   corpus and two public Hugging Face datasets (stdlib only, cached). Results
   are in the README, unflattering numbers included.
