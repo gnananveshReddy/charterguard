@@ -112,6 +112,9 @@ class GuardrailConfig:
     enable_encoded_scan: bool = True
     # Leetspeak, letter spacing, hyphenated line breaks, rot13. See detectors/obfuscation.py.
     enable_obfuscation_scan: bool = True
+    # User turns only: an attack phrase quoted in order to discuss it is lowered
+    # to MEDIUM (flag, not block). Never applied to untrusted layers. See mentions.py.
+    dampen_quoted_mentions: bool = True
     short_circuit_on_critical: bool = True
     policy_version: str = POLICY_VERSION
 

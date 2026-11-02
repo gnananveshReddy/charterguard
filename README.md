@@ -206,6 +206,13 @@ GuardrailConfig().with_mode(Category.INJECTION, Mode.BLOCK)     # one category
 Defaults are deliberate: secrets and exfiltration block, PII is redacted rather
 than blocked, and restricted topics only report.
 
+**Talking about attacks is not an attack.** On the user's own turn, an
+injection phrase quoted in order to discuss it ("Explain 'ignore previous
+instructions' attacks") is lowered to MEDIUM, so it flags rather than blocks,
+and the bare word "jailbreak" is recorded but never blocks. Retrieved content
+and tool output are never dampened -- there, the attacker controls the quotes.
+Set `dampen_quoted_mentions=False` to turn this off.
+
 ## Audit
 
 `verdict.to_audit()` returns a JSON-safe payload. The audit integration turns

@@ -30,7 +30,7 @@ the thread handoff would cost more than the scan.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, TypeVar
 from collections.abc import Callable, Sequence
 
@@ -43,13 +43,15 @@ from .detectors import (
     ObfuscationDetector,
     RuleDetector,
     StructuralDetector,
+    severity_score,
 )
 from .envelope import EnvelopeFactory, SystemPrefixGuard
 from .exceptions import GuardrailBlocked
 from .grounding import GroundingChecker
 from .ledger import SessionLedger
+from .mentions import keep_only_spans, mask_spans, quoted_spans, reads_as_discussion
 from .observability import MetricsSink, NullMetrics, emit as emit_metrics
-from .normalize import normalize
+from .normalize import NormalizedText, normalize
 from .policy import decide, dedupe
 from .redact import RedactionResult, redact
 from .refusals import refusal_for
@@ -60,6 +62,8 @@ from .types import Action, Category, Finding, Layer, Severity, Timer, Verdict
 _T = TypeVar("_T")
 
 _DEFAULT_SESSION = "default"
+# Only instruction-shaped findings can be "mentioned"; a quoted secret is still a secret.
+_DAMPENABLE = frozenset({Category.INJECTION, Category.JAILBREAK})
 
 # Categories redaction can neutralise in place. Everything else -- injection,
 # exfiltration, destructive commands -- must quarantine instead.
@@ -148,6 +152,15 @@ class GuardrailPipeline:
             return cached  # type: ignore[return-value]
 
         nt = normalize(text, max_chars=cfg.budget.max_chars, tail_chars=cfg.budget.tail_chars)
+        findings = self._run_detectors(nt, layer)
+        if layer is Layer.INPUT and cfg.dampen_quoted_mentions:
+            findings = self._dampen_quoted_mentions(text, findings, layer)
+        result = (dedupe(findings), nt.truncated)
+        self._cache.put(key, result)
+        return result
+
+    def _run_detectors(self, nt: NormalizedText, layer: Layer) -> list[Finding]:
+        cfg = self.config
         findings: list[Finding] = []
         for detector in self._detectors:
             findings.extend(detector.scan(nt, layer, cfg))
@@ -155,9 +168,51 @@ class GuardrailPipeline:
                 f.severity is Severity.CRITICAL for f in findings
             ):
                 break
-        result = (dedupe(findings), nt.truncated)
-        self._cache.put(key, result)
-        return result
+        return findings
+
+    def _dampen_quoted_mentions(
+        self, text: str, findings: list[Finding], layer: Layer
+    ) -> list[Finding]:
+        """Lower injection/jailbreak findings that are quoted for discussion.
+
+        See `mentions.py` for the rationale and the limits. The text outside the
+        quotes and the text inside them are re-scanned separately: the rule
+        detector stops at its first CRITICAL match, so reusing `findings` would
+        let a quoted decoy shadow a real attack elsewhere in the turn.
+        """
+        spans = quoted_spans(text)
+        if not spans or not findings:
+            return findings
+        inside = [
+            f for f in findings
+            if f.category in _DAMPENABLE and any(s <= f.start and f.end <= e for s, e in spans)
+        ]
+        if not inside:
+            return findings
+        unquoted = mask_spans(text, spans)
+        if not reads_as_discussion(unquoted):
+            return findings
+        budget = self.config.budget
+        outside = self._run_detectors(
+            normalize(unquoted, max_chars=budget.max_chars, tail_chars=budget.tail_chars), layer
+        )
+        quoted = self._run_detectors(
+            normalize(keep_only_spans(text, spans), max_chars=budget.max_chars, tail_chars=budget.tail_chars),
+            layer,
+        )
+        medium = Severity.MEDIUM
+        softened = [
+            replace(
+                f,
+                severity=medium,
+                score=min(f.score, severity_score(medium)),
+                description=f"{f.description} (quoted in a discussion)",
+            )
+            if f.category in _DAMPENABLE and f.severity > medium
+            else f
+            for f in quoted
+        ]
+        return outside + softened
 
     def _verdict(
         self,
