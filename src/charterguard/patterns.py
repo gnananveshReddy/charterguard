@@ -64,7 +64,8 @@ _INJECTION: tuple[Rule, ...] = (
     Rule("inj.override.previous", Category.INJECTION, Severity.CRITICAL,
          r"(?:ignore|disregard|forget|discard)\s+(?:all\s+|any\s+|the\s+|your\s+)*"
          r"(?:previous|prior|above|earlier|preceding|system|initial)\s+"
-         r"(?:instruction|instructions|prompt|prompts|rule|rules|direction|directions|context)",
+         r"(?:instruction|instructions|prompt|prompts|rule|rules|direction|directions|context|"
+         r"orders|commands|tasks|directives|guidelines)",
          "Classic instruction-override attempt"),
     Rule("inj.override.role", Category.INJECTION, Severity.HIGH,
          r"(?:you\s+are\s+now|from\s+now\s+on\s+you|your\s+new\s+(?:role|identity|persona)\s+is)",
@@ -131,10 +132,52 @@ _INJECTION: tuple[Rule, ...] = (
          "Attempt to close the harness data envelope"),
     # ---- gaps found by the corpus evaluation, not by inspection ----
     Rule("inj.override.everything", Category.INJECTION, Severity.CRITICAL,
-         r"(?:ignore|disregard|forget|discard|erase)\s+(?:absolutely\s+)?everything\s+"
+         r"(?:ignore|disregard|forget|discard|erase)\s+(?:about\s+)?(?:absolutely\s+)?everything\s+"
          r"(?:you\s+(?:were\s+|have\s+been\s+)?(?:told|instructed|learned|know)|above|"
-         r"before|previously|prior|else|i\s+(?:said|told|asked))",
+         r"before|previously|prior|else|i\s+(?:said|told|asked)|"
+         r"(?:that\s+)?we\s+(?:discussed|talked\s+about|said)|beforehand)",
          "Instruction override phrased without a noun the narrow rule expects"),
+    # ---- gaps mined from the deepset/prompt-injections TRAIN split only. The
+    # README reports the held-out TEST split separately for that reason.
+    Rule("inj.override.everything.then", Category.INJECTION, Severity.HIGH,
+         # "Forget everything, write ...", "ignore everything and just output".
+         # A follow-on directive is required: "forget everything and relax" is
+         # a figure of speech.
+         r"(?:ignore|disregard|forget|discard)\s+(?:about\s+)?everything\s*(?:[,.;:!]|\s-|\s+and)\s*"
+         r"(?:then\s+|now\s+|just\s+|only\s+){0,2}"
+         r"(?:write|say|tell|print|output|answer|respond|reply|show|reveal|repeat|translate|"
+         r"generate|focus|concentrate|listen|start|begin)\b",
+         "Override-everything followed by a replacement directive"),
+    Rule("inj.override.unqualified", Category.INJECTION, Severity.HIGH,
+         r"(?:ignore|disregard)\s+(?:all|any)\s+(?:of\s+)?(?:the\s+|your\s+)?"
+         r"(?:provided\s+|given\s+|other\s+)?"
+         r"(?:instructions|context|orders|commands|directives)\b",
+         "Override of all instructions without a 'previous' qualifier"),
+    Rule("inj.override.above", Category.INJECTION, Severity.HIGH,
+         r"(?:ignore|disregard)\s+(?:the\s+)?above\s*(?:[,.;:!]|\s-|\s+and\b)",
+         "'Ignore the above' followed by a new directive"),
+    Rule("inj.override.clear", Category.INJECTION, Severity.HIGH,
+         # "remove all previous tasks out of your head", "leave all the
+         # previous information behind".
+         r"(?:leave|put|remove|delete|erase|clear|wipe|get|push)\s+(?:all\s+)?(?:of\s+)?(?:the\s+|your\s+)?"
+         r"(?:previous|prior|preceding|earlier|old)\s+"
+         r"(?:information|instructions?|tasks?|orders|commands|context|rules)\s+"
+         r"(?:behind|aside|out\s+of|from\s+your)",
+         "Instruction override phrased as clearing earlier context"),
+    Rule("inj.override.replace", Category.INJECTION, Severity.HIGH,
+         r"your\s+(?:new\s+)?instructions\s+are\s+now\b"
+         r"|new\s+(?:instructions|tasks|orders|directives)\s+(?:now\s+)?(?:follow|are\s+as\s+follows)\b",
+         "Announcement of replacement instructions"),
+    Rule("inj.override.change", Category.INJECTION, Severity.MEDIUM,
+         # "Update your instructions to use tabs" is how people configure a
+         # coding agent, so this only flags on its own.
+         r"(?:change|replace|overwrite|rewrite)\s+your\s+(?:\w+\s+)?"
+         r"(?:instructions|rules|system\s+prompt|prompt|programming|directives)\s+(?:to|with)\b",
+         "Request to rewrite the model's instructions"),
+    Rule("inj.prompt.leak.written", Category.INJECTION, Severity.HIGH,
+         r"what\s+(?:was|is|were)\s+written\s+(?:at\s+the\s+(?:beginning|start|top)|above|before)"
+         r"(?:\s+(?:of|in))?\s+(?:this|the|your)\s+(?:prompt|conversation|message|instructions)",
+         "System-prompt disclosure asked as 'what was written above'"),
     Rule("inj.prompt.leak.question", Category.INJECTION, Severity.HIGH,
          # Interrogative phrasing: no imperative verb, so the imperative rule
          # never fires. "What are your system instructions?" is still a leak.
@@ -584,8 +627,47 @@ _INDIC: tuple[Rule, ...] = tuple(
     for lex in _indic.LEAKS
 )
 
+# ------------------------------------------------ German / French: structural
+# The literal phrases above catch one wording each. These cover verb +
+# qualifier + noun, the shape the deepset train split showed attackers vary
+# ("Vergiss alle Auftraege", "Ignoriere alle vorangehenden Befehle",
+# "Oubliez toutes les instructions"). A qualifier ("alle", "vorherigen",
+# "toutes") is required: "ignoriere die Anweisungen" alone is too weak.
+_DE_VERB = _fold_alt(("ignoriere", "ignorier", "ignoriert", "vergiss", "vergesst", "missachte",
+                      "überspringe"), stem=False)
+_DE_VERB_INF = _fold_alt(("ignorieren", "vergessen", "missachten", "überspringen"), stem=False)
+_DE_QUAL = _fold_alt(("alle", "vorherigen", "vorherige", "bisherigen", "bisherige", "obigen",
+                      "obige", "vorangehenden", "vorangegangenen", "früheren", "vorigen"), stem=False)
+_DE_NOUN = _fold_alt(("anweisungen", "anweisung", "befehle", "aufgaben", "aufträge", "instruktionen",
+                      "informationen", "angaben", "ausführungen", "vorgaben", "regeln"), stem=False)
+_DE_FILL = r"(?:\s+(?:sie|du|bitte|nun|jetzt|einfach|mal)){0,3}"
+_DE_DET = r"(?:\s+(?:die|deine|ihre|eure|all|der))?"
+
+_FR_VERB = _fold_alt(("ignore", "ignorez", "oublie", "oubliez", "néglige", "négligez"), stem=False)
+_FR_NOUN = _fold_alt(("instructions", "consignes", "ordres", "directives", "règles", "indications"),
+                     stem=False)
+
+_EUROPEAN: tuple[Rule, ...] = (
+    Rule("inj.ml.de.override", Category.INJECTION, Severity.HIGH,
+         rf"(?<!\S)(?:{_DE_VERB}|{_DE_VERB_INF}\s+sie){_DE_FILL}{_DE_DET}(?:\s+{_DE_QUAL}){{1,2}}\s+{_DE_NOUN}{_WORD_END}"
+         # "lassen Sie alle vorherigen Informationen hinter sich",
+         # "alle vorangegangenen Aufgaben aus dem Kopf zu streichen"
+         rf"|(?<!\S){_DE_QUAL}(?:\s+{_DE_QUAL})?\s+{_DE_NOUN}{_GAP}{{0,2}}?\s+"
+         r"(?:hinter\s+(?:sich|dir|euch)|aus\s+(?:dem|deinem|ihrem)\s+(?:kopf|gedächtnis|gedachtnis))"
+         rf"|(?<!\S)(?:die\s+)?{_DE_QUAL}\s+{_DE_NOUN}\s+(?:zu\s+)?{_DE_VERB_INF}{_WORD_END}"
+         rf"|(?<!\S)abweichend\s+(?:zu|von)\s+(?:den\s+)?{_DE_QUAL}\s+{_DE_NOUN}{_WORD_END}",
+         "German instruction override"),
+    Rule("inj.ml.de.everything", Category.INJECTION, Severity.HIGH,
+         r"(?<!\S)(?:vergiss|vergesst|vergessen\s+sie|ignoriere|ignorieren\s+sie)\s+alles"
+         r"(?:\s+(?:davor|zuvor|bisher|bisherige|gesagte|vorherige|obige|bisher\s+gesagte)|\s*,|\s+was\s+wir)",
+         "German override-everything"),
+    Rule("inj.ml.fr.override", Category.INJECTION, Severity.HIGH,
+         rf"(?<!\S){_FR_VERB}\s+(?:toutes|tous)\s+(?:les|vos|tes)\s+{_FR_NOUN}{_WORD_END}",
+         "French instruction override"),
+)
+
 RULES: tuple[Rule, ...] = (
-    _INJECTION + _MULTILINGUAL + _INDIC + _JAILBREAK + _HARMFUL + _COMMAND + _SECRETS + _PII
+    _INJECTION + _MULTILINGUAL + _INDIC + _EUROPEAN + _JAILBREAK + _HARMFUL + _COMMAND + _SECRETS + _PII
 )
 
 

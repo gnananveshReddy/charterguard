@@ -12,6 +12,16 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Detection vocabulary: overrides of "orders / tasks / commands / directives",
+  "forget everything, <directive>", "ignore all instructions", "ignore the above,",
+  clearing earlier context ("leave all previous information behind"), replacement
+  announcements ("your instructions are now", "new instructions follow") and
+  "what was written at the beginning of this prompt". Structural German and French
+  override rules (verb + qualifier + noun, both word orders for German). Mined from
+  the deepset train split; held-out test recall 0.05 -> 0.20, precision 1.00.
+- Obfuscation detector: a quote-wrapping view, so `your "system" prompt` or
+  `all **previous** instructions` match like the unquoted phrase. A phrase quoted
+  as a whole, JSON keys and apostrophes are not affected.
 - Project hygiene: CONTRIBUTING, CODE_OF_CONDUCT (Contributor Covenant 2.1),
   issue templates for missed attacks / false positives / bugs / features, a PR
   template, Dependabot, CodeQL, OpenSSF Scorecard, and a release workflow with
