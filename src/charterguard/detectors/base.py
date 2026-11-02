@@ -13,7 +13,7 @@ from ..normalize import NormalizedText
 from ..patterns import Rule, rules_for
 from ..scanner import CompiledRuleSet, compile_rules
 from ..types import Category, Finding, Layer, Severity
-from ..validators import digits, looks_random, luhn_ok, verhoeff_ok
+from ..validators import digits, gstin_ok, india_mobile_ok, looks_random, luhn_ok, verhoeff_ok
 
 # Severity -> base confidence. Deterministic rules are high-precision by
 # construction, so even MEDIUM sits above a typical 0.55 flag threshold.
@@ -50,6 +50,8 @@ _VALIDATORS = {
     "verhoeff": verhoeff_ok,
     "entropy": lambda m: looks_random(_rhs(m)),
     "phone": _phone_ok,
+    "gstin": gstin_ok,
+    "india_mobile": india_mobile_ok,
 }
 
 

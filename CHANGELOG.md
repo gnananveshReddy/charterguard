@@ -43,6 +43,14 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
   so "follow all previous instructions" stays allowed. Malayalam accepts both
   atomic chillu letters and the virama+ZWJ spelling.
 
+- India PII: `pii.gstin.in` (mod-36 check digit), `pii.upi.in` (VPA handles
+  of the major UPI apps and banks; `user@sbi.co.in` stays an email),
+  `pii.phone.in` (the common `98765 43210` grouping, which the generic phone
+  rule could not split, with a 6-9 leading-digit gate), and
+  `pii.passport.in` (only next to the word "passport"). Redaction labels
+  `GSTIN`, `UPI`, `PASSPORT`.
+- `pii.pan.in` is MEDIUM only with a valid holder-type letter; any other
+  PAN-shaped value is still redacted as `pii.pan.in.shape` (LOW).
 ### Changed
 - False positives removed (all blocked in strict mode before):
   - `inj.prompt.leak`: generic nouns need "your" -- "print the configuration

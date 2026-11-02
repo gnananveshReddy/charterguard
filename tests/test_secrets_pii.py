@@ -42,8 +42,10 @@ def test_card_detection_uses_luhn():
 
 
 def test_aadhaar_detection_uses_verhoeff():
-    assert verhoeff_ok("234567890124") in (True, False)  # checksum-dependent
-    assert not verhoeff_ok("234567890123") or verhoeff_ok("234567890123")
+    assert verhoeff_ok("234567890124")
+    # Every single-digit change breaks a Verhoeff checksum.
+    assert not any(verhoeff_ok("23456789012" + d) for d in "0123456789" if d != "4")
+    assert not verhoeff_ok("134567890124")  # Aadhaar never starts with 0 or 1
 
 
 def test_generic_credential_requires_entropy():
