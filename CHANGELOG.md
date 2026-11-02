@@ -11,6 +11,19 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 
 ## [Unreleased]
 
+### Security
+- HTTP adapters (`HttpModelScorer`, `OpenAIModerationScorer`,
+  `HttpIntentClassifier`, `HttpEntityRecognizer`) now accept only `https`, or
+  `http` with `allow_insecure_http=True`. Previously the opt-in admitted any
+  scheme, including `file://`, which `urlopen` reads from local disk.
+- HTTP adapters no longer follow redirects. urllib re-sends `Authorization`
+  and API-key headers to the redirect target, so a 3xx could forward the
+  credential (and prompt content) to an unconfigured host or to plaintext.
+  A redirect now raises `HttpError` with the 3xx status.
+- ONNX model downloads follow redirects only to `https` URLs.
+- `SqliteCounterStore` asserts at import that interpolated column names are
+  plain identifiers; all values were and remain bound parameters.
+
 ## [0.1.0]
 
 First public release under the name **charterguard**.

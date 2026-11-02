@@ -37,6 +37,7 @@ import asyncio
 import hashlib
 import os
 import tempfile
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -168,8 +169,9 @@ class OnnxModelSpec:
             )
         if self.activation not in ("sigmoid", "softmax", "none"):
             raise ModelIntegrityError("activation must be 'sigmoid', 'softmax' or 'none'")
-        if not self.base_url.startswith("https://"):
-            raise ModelIntegrityError("base_url must be https")
+        parts = urllib.parse.urlsplit(self.base_url)
+        if parts.scheme.lower() != "https" or not parts.hostname:
+            raise ModelIntegrityError("base_url must be an https URL with a host")
         if self.max_length < 8 or self.max_length > 8192:
             raise ModelIntegrityError("max_length must be between 8 and 8192")
 
@@ -195,6 +197,24 @@ def _sha256_file(path: Path, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
+class _HttpsOnlyRedirect(urllib.request.HTTPRedirectHandler):
+    """Follow redirects, but never off https.
+
+    Model hubs redirect file downloads to a CDN, so redirects must be followed.
+    The SHA-256 check already makes a tampered file harmless, but a downgrade to
+    http still leaks which model and revision this host loads, and a redirect
+    to ``file:`` or another scheme has no legitimate use.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        if urllib.parse.urlsplit(newurl).scheme.lower() != "https":
+            raise ModelIntegrityError(f"refusing redirect off https to {newurl!r}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_HttpsOnlyRedirect)
+
+
 def _download(url: str, dest: Path, expected: str, timeout_s: float) -> None:
     """Stream to a temp file, verify, then atomically rename.
 
@@ -207,10 +227,13 @@ def _download(url: str, dest: Path, expected: str, timeout_s: float) -> None:
     tmp = Path(tmp_name)
     os.close(tmp_fd)
     try:
-        req = urllib.request.Request(url, headers={"user-agent": "charterguard/1.3"})
+        if urllib.parse.urlsplit(url).scheme.lower() != "https":
+            raise ModelIntegrityError(f"refusing non-https download {url!r}")
+        req = urllib.request.Request(url, headers={"user-agent": "charterguard"})  # noqa: S310 - https checked
         h = hashlib.sha256()
         total = 0
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp, tmp.open("wb") as out:
+        # https enforced above and on every redirect hop.
+        with _OPENER.open(req, timeout=timeout_s) as resp, tmp.open("wb") as out:  # noqa: S310
             while True:
                 block = resp.read(1 << 20)
                 if not block:

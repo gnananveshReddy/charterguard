@@ -62,10 +62,6 @@ ignore = [
     "SIM105",  # try/except/pass keeps the "why this must never raise" comment in place
     "SIM108",  # ternaries over multi-clause conditions hurt readability
     "UP042",  # (str, Enum) is kept: StrEnum changes str() output, a public behaviour
-    # Deferred to the security-hardening change, which fixes them rather than
-    # silencing them: URL scheme allowlists for urlopen, validated SQL identifiers.
-    "S310",
-    "S608",
 ]
 
 [tool.ruff.lint.per-file-ignores]
