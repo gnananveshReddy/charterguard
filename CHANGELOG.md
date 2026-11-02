@@ -11,6 +11,16 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 
 ## [Unreleased]
 
+### Added
+- `ObfuscationDetector`, on by default: detects injection hidden by
+  leetspeak (`1gn0r3 4ll pr3v10us`), letter spacing (`i g n o r e`,
+  `i.g.n.o.r.e`), hyphenated line breaks (`prev-
+ious`) and rot13. All four
+  bypassed every rule before. Concealment raises severity, as for encoded
+  payloads. Disable with `GuardrailConfig(enable_obfuscation_scan=False)`.
+- Corpus: four new attack families and benign texts that deliberately open
+  the obfuscation gates (`3rd`, `w3c`, `U.S.A.`, hyphenated prose).
+
 ### Security
 - HTTP adapters (`HttpModelScorer`, `OpenAIModerationScorer`,
   `HttpIntentClassifier`, `HttpEntityRecognizer`) now accept only `https`, or

@@ -40,6 +40,7 @@ from .detectors import (
     EncodedPayloadDetector,
     ModelDetector,
     ModelScorer,
+    ObfuscationDetector,
     RuleDetector,
     StructuralDetector,
 )
@@ -126,6 +127,7 @@ class GuardrailPipeline:
             RuleDetector(),
             StructuralDetector(),
             EncodedPayloadDetector(),
+            ObfuscationDetector(),
         )
         self._model = ModelDetector(model) if model is not None else None
         self._cache = ResultCache(self.config.budget.cache_size)
