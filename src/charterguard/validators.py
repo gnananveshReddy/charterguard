@@ -129,3 +129,32 @@ def india_mobile_ok(value: str) -> bool:
             d = d[len(prefix) :]
             break
     return len(d) == 10 and d[0] in "6789" and len(set(d)) > 2
+
+
+# IBAN length by country (ISO 13616 / SWIFT IBAN registry).
+_IBAN_LENGTHS = {
+    "ad": 24, "ae": 23, "al": 28, "at": 20, "az": 28, "ba": 20, "be": 16, "bg": 22, "bh": 22,
+    "bi": 27, "br": 29, "by": 28, "ch": 21, "cr": 22, "cy": 28, "cz": 24, "de": 22, "dj": 27,
+    "dk": 18, "do": 28, "ee": 20, "eg": 29, "es": 24, "fi": 18, "fk": 18, "fo": 18, "fr": 27,
+    "gb": 22, "ge": 22, "gi": 23, "gl": 18, "gr": 27, "gt": 28, "hn": 28, "hr": 21, "hu": 28,
+    "ie": 22, "il": 23, "iq": 23, "is": 26, "it": 27, "jo": 30, "kw": 30, "kz": 20, "lb": 28,
+    "lc": 32, "li": 21, "lt": 20, "lu": 20, "lv": 21, "ly": 25, "mc": 27, "md": 24, "me": 22,
+    "mk": 19, "mn": 20, "mr": 27, "mt": 31, "mu": 30, "ni": 28, "nl": 18, "no": 15, "om": 23,
+    "pk": 24, "pl": 28, "ps": 29, "pt": 25, "qa": 29, "ro": 24, "rs": 22, "ru": 33, "sa": 24,
+    "sc": 31, "sd": 18, "se": 24, "si": 19, "sk": 24, "sm": 27, "so": 23, "st": 25, "sv": 28,
+    "tl": 23, "tn": 24, "tr": 26, "ua": 29, "va": 22, "vg": 24, "xk": 20, "ye": 30,
+}
+
+
+def iban_ok(candidate: str) -> bool:
+    """ISO 13616: known country, that country's length, and mod-97 == 1.
+
+    Without this, the IBAN shape (two letters, two digits, alphanumerics) also
+    matches hex digests, git SHAs and random ids such as ``ab12f9e8c7d6b5a4``.
+    """
+    s = "".join(candidate.split()).lower()
+    if _IBAN_LENGTHS.get(s[:2]) != len(s) or not s.isalnum() or not s.isascii():
+        return False
+    rearranged = s[4:] + s[:4]
+    digits_only = "".join(str(int(ch, 36)) for ch in rearranged)
+    return int(digits_only) % 97 == 1

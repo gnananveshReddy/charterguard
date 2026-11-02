@@ -97,6 +97,10 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 - `jb.unrestricted` also covers "an AI without any guidelines".
 
 ### Fixed
+- `pii.iban` matched any token shaped like two letters, two digits and alphanumerics, so
+  hex digests, git SHAs and random ids (`ab12f9e8c7d6b5a4`) were redacted as IBANs. It now
+  requires an ISO 13616 country code, that country's length and a valid mod-97 checksum,
+  and also matches IBANs printed in groups of four.
 - Prefilter soundness: `required_literals` read lookbehinds `(?<!` / `(?<=`
   as the literal text `?<!`. When a rule's real literals were short, the bogus
   literal won and the rule could never fire with the prefilter on, while

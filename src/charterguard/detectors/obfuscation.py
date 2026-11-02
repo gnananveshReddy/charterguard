@@ -262,11 +262,19 @@ def deobfuscate(
     if not (hyphen or spaced or leet or rot13 or wrapped):
         return
     base = list(source) if source is not None else list(range(len(text)))
+    yield from _concealment_views(text, base, original, hyphen=hyphen, spaced=spaced, leet=leet, rot13=rot13)
+    # Last, so a concealment view always claims a rule first: its finding is
+    # the raised one, and must not be shadowed by the plain quote-view finding.
     if wrapped:
         unwrapped = _unwrap(text, base)
         if unwrapped is not None:
             u_text, u_src, u_changed = unwrapped
             yield DeobfuscatedView(_QUOTES, u_text, tuple(u_src), tuple(u_changed))
+
+
+def _concealment_views(
+    text: str, base: list[int], original: str | None, *, hyphen: bool, spaced: bool, leet: bool, rot13: bool
+) -> Iterator[DeobfuscatedView]:
     if not (hyphen or spaced or leet or rot13):
         return
     orig = text if original is None else original
@@ -360,8 +368,14 @@ class ObfuscationDetector:
         views = deobfuscate(nt.text, _LazySourceMap(nt), nt.original)
         findings: list[Finding] = []
         reported: set[str] = set()
+        # Separate budgets: quote-wrapping hits (common, plain severity) must
+        # not use up the slots a raised concealment finding needs.
+        budget = {True: _MAX_FINDINGS, False: _MAX_FINDINGS}
         source = nt.original
         for view in views:
+            quotes = view.technique == _QUOTES
+            if budget[quotes] <= 0:
+                continue
             for lo, hi in _windows(view.changed, len(view.text)):
                 inner = normalize(view.text[lo:hi], max_chars=len(view.text) + 1)
                 for m in self._ruleset.scan(inner.text, limit=4):
@@ -394,8 +408,11 @@ class ObfuscationDetector:
                         )
                     )
                     reported.add(m.rule.id)
-                    if len(findings) >= _MAX_FINDINGS:
-                        return findings
+                    budget[quotes] -= 1
+                    if budget[quotes] <= 0:
+                        break
+                if budget[quotes] <= 0:
+                    break
         return findings
 
 

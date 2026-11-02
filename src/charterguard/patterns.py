@@ -489,7 +489,11 @@ _PII: tuple[Rule, ...] = (
          r"passport\s*(?:no\.?|number|#)?[\s:.#\-]{0,4}[a-z][1-9]\d{5}[1-9]\b",
          "Passport number (IN)"),
     Rule("pii.iban", Category.PII, Severity.MEDIUM,
-         r"\b[a-z]{2}\d{2}[a-z0-9]{10,30}\b", "IBAN"),
+         # Compact or printed in groups of four ("DE89 3704 0044 ..."). The
+         # validator checks country, length and mod-97: the bare shape also
+         # matches hex digests and git SHAs.
+         r"\b[a-z]{2}\d{2}(?: ?[a-z0-9]{4}){2,7}(?: ?[a-z0-9]{1,4})?\b", "IBAN",
+         validate="iban"),
     Rule("pii.mrn", Category.PII, Severity.MEDIUM,
          r"(?:mrn|patient\s+id|medical\s+record\s+(?:number|no))[\s:#]{1,4}[a-z0-9\-]{5,20}",
          "Medical record number"),
