@@ -333,9 +333,14 @@ them through the tool-output guard before the model sees them:
 ```python
 from charterguard.integrations import guard_mcp_result
 
-safe = guard_mcp_result(pipeline, result, tool_name="search")  # text blocks enveloped,
-                                                              # isError set if quarantined
+safe = guard_mcp_result(pipeline, result, tool_name="search")
 ```
+
+It fails closed. Every readable part (text, embedded resources, link descriptions,
+`structuredContent`) is scanned as one payload, so an attack split across blocks is
+caught. The model gets a single redacted, enveloped text block. Raw
+`structuredContent`, unknown or binary blocks and server `_meta` are never forwarded,
+media only with `allow_media=True`, and a quarantined result is marked `isError`.
 
 ## Detection accuracy
 

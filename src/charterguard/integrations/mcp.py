@@ -295,47 +295,106 @@ def serve_stdio(
 
 
 # ------------------------------------------------------------- client side
+_MEDIA_TYPES = frozenset({"image", "audio"})
+
+
+def _str_field(block: Mapping[str, Any], key: str) -> str | None:
+    value = block.get(key)
+    return value if isinstance(value, str) and value else None
+
+
+def _block_text(block: object) -> tuple[str | None, str | None]:
+    """(text the model would read, reason the block cannot be forwarded)."""
+    if not isinstance(block, Mapping):
+        return None, "malformed block"
+    kind = block.get("type")
+    if kind == "text":
+        text = _str_field(block, "text")
+        return (text, None) if text is not None else (None, "malformed text block")
+    if kind == "resource":
+        resource = block.get("resource")
+        if not isinstance(resource, Mapping):
+            return None, "malformed resource block"
+        text = _str_field(resource, "text")
+        if text is None:
+            return None, "binary resource"  # blob: cannot be inspected
+        uri = _str_field(resource, "uri") or "resource"
+        return f"[{uri}]\n{text}", None
+    if kind == "resource_link":
+        parts = [p for p in (_str_field(block, k) for k in ("title", "name", "description", "uri")) if p]
+        return ("[link] " + " | ".join(parts), None) if parts else (None, "empty resource link")
+    if kind in _MEDIA_TYPES:
+        return None, None  # handled by the caller's allow_media choice
+    return None, f"unsupported block type {kind!r}"
+
+
 def guard_mcp_result(
     pipeline: GuardrailPipeline,
     result: Mapping[str, Any],
     *,
     tool_name: str,
     session_id: str | None = None,
+    allow_media: bool = False,
 ) -> dict[str, Any]:
-    """Guard a ``tools/call`` result from another MCP server.
+    """Guard a ``tools/call`` result from another MCP server. Fails closed.
 
-    Each text block is replaced by the pipeline's envelope (the content wrapped
-    as untrusted data, or a quarantine note). If any block is quarantined the
-    result is marked ``isError`` so the agent does not treat it as a normal
-    answer. Structured content is serialized and checked too, then dropped
-    when quarantined. The verdicts are attached under ``_meta.charterguard``.
+    * Everything the model could read -- text blocks, embedded resource text,
+      resource-link titles and descriptions, and ``structuredContent`` as JSON --
+      is combined into **one** payload and inspected once, so an attack split
+      across blocks is seen whole and redaction applies across boundaries.
+    * The result carries a single text block: the pipeline's envelope of that
+      payload (redacted and wrapped as data, or a quarantine note). The raw
+      ``structuredContent`` is never forwarded, and no original block is
+      passed through with its fields or annotations.
+    * Binary resources, unknown block types and malformed blocks are dropped,
+      with a note. Images and audio cannot be inspected; they are dropped
+      unless ``allow_media=True``, and always when anything is quarantined.
+    * A quarantined result is marked ``isError``. A summary of the verdict
+      (never the content) is attached under ``_meta.charterguard``.
     """
-    kwargs: dict[str, Any] = {"tool_name": tool_name}
+    kwargs: dict[str, Any] = {"tool_name": tool_name, "redact_secrets": True}
     if session_id is not None:
         kwargs["session_id"] = session_id
-    blocks: list[Any] = []
-    verdicts: list[dict[str, Any]] = []
-    quarantined = False
-    for block in result.get("content") or []:
-        if isinstance(block, Mapping) and block.get("type") == "text" and isinstance(block.get("text"), str):
-            checked = pipeline.inspect_tool_output(block["text"], **kwargs)
-            quarantined |= checked.quarantined
-            verdicts.append({"quarantined": checked.quarantined, **_summary(checked.verdict)})
-            blocks.append({**block, "text": checked.envelope})
-        else:
-            blocks.append(block)  # images/audio/resource links pass through unchanged
-    guarded: dict[str, Any] = {k: v for k, v in result.items() if k not in ("content", "structuredContent")}
-    guarded["content"] = blocks
+
+    parts: list[str] = []
+    dropped: list[str] = []
+    media: list[dict[str, Any]] = []
+    raw_content = result.get("content")
+    blocks = raw_content if isinstance(raw_content, list) else []
+    if raw_content is not None and not isinstance(raw_content, list):
+        dropped.append("malformed content")
+    for block in blocks:
+        text, reason = _block_text(block)
+        if text is not None:
+            parts.append(text)
+        elif reason is not None:
+            dropped.append(reason)
+        else:  # media
+            assert isinstance(block, Mapping)  # noqa: S101 -- _block_text only returns (None, None) for media
+            data, mime = _str_field(block, "data"), _str_field(block, "mimeType")
+            if allow_media and data and mime:
+                media.append({"type": block["type"], "data": data, "mimeType": mime})
+            else:
+                dropped.append(f"{block['type']} not forwarded")
     structured = result.get("structuredContent")
     if structured is not None:
-        checked = pipeline.inspect_tool_output(json.dumps(structured, ensure_ascii=False), **kwargs)
-        quarantined |= checked.quarantined
-        verdicts.append({"quarantined": checked.quarantined, "structured": True, **_summary(checked.verdict)})
-        if not checked.quarantined:
-            guarded["structuredContent"] = structured
-    if quarantined:
+        parts.append("[structured]\n" + json.dumps(structured, ensure_ascii=False, default=str))
+
+    checked = pipeline.inspect_tool_output("\n\n".join(parts), **kwargs)
+    quarantined = checked.quarantined
+    text = checked.envelope
+    if dropped:
+        text += "\n[charterguard: dropped " + ", ".join(sorted(set(dropped))) + "]"
+
+    guarded: dict[str, Any] = {"content": [{"type": "text", "text": text}, *([] if quarantined else media)]}
+    if quarantined or result.get("isError") is True:
         guarded["isError"] = True
-    meta = dict(result.get("_meta") or {})
-    meta["charterguard"] = {"quarantined": quarantined, "verdicts": verdicts}
-    guarded["_meta"] = meta
+    guarded["_meta"] = {
+        "charterguard": {
+            "quarantined": quarantined,
+            "dropped": sorted(set(dropped)),
+            "redactions": int(checked.verdict.meta.get("redaction_count", 0)),
+            "verdict": _summary(checked.verdict),
+        }
+    }
     return guarded
