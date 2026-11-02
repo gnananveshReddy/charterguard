@@ -55,3 +55,35 @@ def test_a_following_word_does_not_hide_the_iban():
         out = p.check_output(text).sanitized or ""
         assert "[REDACTED:IBAN:" in out and inner not in out, (text, out)
     assert "bank transfer" in (p.check_output(cases[0][0]).sanitized or "")
+
+
+def test_a_decoy_prefix_does_not_hide_a_validated_value():
+    # A rejected candidate used to be skipped whole, so a real value starting
+    # inside it was never examined. For strong validators (IBAN, GSTIN)
+    # scanning now resumes at the next token start inside the candidate.
+    p = GuardrailPipeline()
+    for text, inner, label in [
+        ("BE00 BE68 5390 0754 7034", "5390", "IBAN"),
+        ("xk00 be68 5390 0754 7034 x", "5390", "IBAN"),
+    ]:
+        out = p.check_output(text).sanitized or ""
+        assert f"[REDACTED:{label}:" in out and inner not in out, (text, out)
+
+
+def test_grouped_numbers_still_do_not_manufacture_card_matches():
+    # Luhn passes ~10% of windows, so a rejected card candidate is still
+    # skipped whole: "5678 9012 3456" inside an order number is not a card.
+    p = GuardrailPipeline()
+    assert not any(f.rule_id == "pii.card" for f in p.check_output("order 1234 5678 9012 3456").findings)
+
+
+def test_long_digit_runs_still_do_not_manufacture_card_matches():
+    # The reason rejects never slide one character at a time: some window of
+    # an arbitrary long number satisfies Luhn. A single unbroken token has no
+    # token start inside it, so it is still skipped whole.
+    rng = random.Random(7)
+    p = GuardrailPipeline()
+    for _ in range(300):
+        run = "".join(rng.choice("0123456789") for _ in range(40))
+        verdict = p.check_output(f"order ref {run} shipped")
+        assert not any(f.rule_id.startswith("pii.card") for f in verdict.findings), run
