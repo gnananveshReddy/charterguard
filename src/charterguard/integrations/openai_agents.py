@@ -89,15 +89,37 @@ _TRUSTED_ROLES = frozenset({"system", "developer"})
 _METADATA_KEYS = frozenset({"id", "call_id", "status", "type", "role"})
 
 
+def _leaves(value: object, out: list[str], depth: int = 0) -> None:
+    """Collect every string (and key) in ``value`` as plain, unescaped text."""
+    if depth > 64:
+        out.append(str(value))
+    elif isinstance(value, str):
+        out.append(value)
+    elif isinstance(value, Mapping):
+        for k, v in value.items():
+            out.append(str(k))
+            _leaves(v, out, depth + 1)
+    elif isinstance(value, list | tuple | set | frozenset):
+        for v in value:
+            _leaves(v, out, depth + 1)
+    elif value is not None and not isinstance(value, bool | int | float):
+        out.append(str(value))
+
+
 def _item_text(item: Mapping[str, Any]) -> str:
-    """Every model-readable string an untrusted input item carries."""
+    """Every model-readable string an untrusted input item carries.
+
+    Each string leaf is scanned as plain text. A JSON dump alone would hide a
+    pattern behind escaping (a newline becomes the two characters ``\\n``, a
+    quote becomes ``\\"``), so the dump is only appended for structure.
+    """
     payload = {k: v for k, v in item.items() if k not in _METADATA_KEYS}
     if not payload:
         return ""
-    # Plain text first, so a scan sees "content" as prose rather than JSON.
-    prose = _content_text(payload.get("content")) if "content" in payload else ""
+    texts: list[str] = []
+    _leaves(payload, texts)
     rest = json.dumps(payload, ensure_ascii=False, default=str)
-    return f"{prose}\n{rest}" if prose else rest
+    return "\n".join([*(t for t in texts if t), rest])
 
 
 def input_text(user_input: str | Sequence[Any]) -> tuple[str, list[str]]:
