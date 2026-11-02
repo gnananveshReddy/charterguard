@@ -23,9 +23,13 @@ rule categories, and reports a match only if it overlaps a change. The
 concealment is itself the signal, so severity is raised the same way the
 encoded detector raises it.
 
-Word gaps survive normalization even though whitespace runs are collapsed: a
-collapsed run shows up in the offset map as a source jump greater than one.
-Letter spacing uses that to keep ``i g n o r e  a l l`` as two words.
+Word gaps survive normalization even though whitespace runs are collapsed:
+the detector looks at the *original* characters behind each normalized space
+and treats it as a word gap only if they hold two or more whitespace
+characters. (A bare source-index jump is not enough -- stripped zero-width
+characters cause jumps too, and an attacker can place them to split a run.)
+Letter spacing uses that to keep ``i g n o r e  a l l`` as two words, and
+hyphenation joins only where the original has a real newline.
 
 Cost control: each technique has a C-speed gate on a byte "shape" of the text,
 and work is proportional to the obfuscated region, not the document.
@@ -93,7 +97,7 @@ _HYPHEN_MARKERS = ("-\n", "- ")
 _ROT13_MARKERS = (" gur ", " naq ", " lbh ", " nyy ", "vtaber", "cerivbhf", "vafgehpgvbaf", "flfgrz", "cebzcg")
 
 _SPACED_RUN = re.compile(r"(?<![a-z])(?:[a-z][ ._*|\-]){2,}[a-z](?![a-z])")
-_HYPHEN_BREAK = re.compile(r"[a-z]-[ \n][a-z]")
+_HYPHEN_BREAK = re.compile(r"[a-z]-\s+[a-z]")
 _ROT13_WORDS = re.compile(r"\b(?:gur|naq|lbh|vtaber|cerivbhf|vafgehpgvbaf|flfgrz|cebzcg|nyy)\b")
 
 # "!" is deliberately not a leet character: it ends sentences, and folding it
@@ -118,10 +122,17 @@ class DeobfuscatedView:
     changed: tuple[int, ...]
 
 
-def _wide(src: Sequence[int], i: int) -> bool:
-    """True when position ``i`` stands for more than one source character,
-    i.e. the normalizer collapsed a whitespace run here."""
-    return i + 1 < len(src) and src[i + 1] - src[i] > 1
+def _word_gap(original: str, src: Sequence[int], i: int) -> bool:
+    """True when the normalized space at ``i`` stands for a whitespace run of
+    two or more characters in the original -- a deliberate word gap.
+
+    Counts whitespace in the original stretch rather than trusting the size of
+    the source jump: invisible characters the normalizer stripped also make the
+    jump larger, and must not turn a letter-spaced run into separate words.
+    """
+    if i + 1 >= len(src):
+        return False
+    return sum(c.isspace() for c in original[src[i] : src[i + 1]]) >= 2
 
 
 def _join(
@@ -188,11 +199,13 @@ def _unleet(text: str) -> tuple[str, list[int]]:
     return _LEET_TOKEN.sub(fix, text), changed
 
 
-def deobfuscate(text: str, source: Sequence[int] | None = None) -> Iterator[DeobfuscatedView]:
+def deobfuscate(
+    text: str, source: Sequence[int] | None = None, original: str | None = None
+) -> Iterator[DeobfuscatedView]:
     """Yield one view per applicable technique family.
 
     ``text`` should be normalized (lowercase, folded); ``source`` maps each of
-    its characters to the original text and defaults to the identity. Spacing,
+    its characters to ``original`` (default: ``text`` itself, identity map). Spacing,
     hyphenation and leetspeak are combined into one view, because attackers
     combine them. rot13 is a separate view: applying it on top of the others
     would scramble them.
@@ -205,22 +218,24 @@ def deobfuscate(text: str, source: Sequence[int] | None = None) -> Iterator[Deob
     if not (hyphen or spaced or leet or rot13):
         return
     base = list(source) if source is not None else list(range(len(text)))
+    orig = text if original is None else original
 
     techniques: list[str] = []
     view, src = text, base
     changed: list[int] = []
     if hyphen:
-        # Join only across a real line break: a newline, or a collapsed
-        # whitespace run (CRLF after a hyphen normalizes to "- "). "well- known"
-        # with a single space is left alone.
-        breaks = _HyphenBreaks(src)
+        # Join only across a real line break in the ORIGINAL text; CRLF, or a
+        # newline with spaces or invisible characters around it, normalizes to
+        # a hyphen plus one whitespace character. "well- known" on one line is
+        # left alone.
+        breaks = _HyphenBreaks(src, orig)
         if next(breaks.finditer(view), None) is not None:
             view, src, changed = _join(view, src, changed, breaks, lambda i: False)
             techniques.append("hyphenation")
     if spaced and _SPACED_RUN.search(view):
         cur_src = src
         view, src, changed = _join(
-            view, src, changed, _SPACED_RUN, lambda i: view[i] == " " and _wide(cur_src, i)
+            view, src, changed, _SPACED_RUN, lambda i: view[i] == " " and _word_gap(orig, cur_src, i)
         )
         techniques.append("letter-spacing")
     if leet:
@@ -239,18 +254,20 @@ def deobfuscate(text: str, source: Sequence[int] | None = None) -> Iterator[Deob
 
 
 class _HyphenBreaks:
-    """Pattern-like: yields only hyphen breaks that sit on a real line break,
-    so `_join` can stay generic."""
+    """Pattern-like: yields only hyphen breaks that sit on a real line break in
+    the original text, so `_join` can stay generic."""
 
-    __slots__ = ("_src",)
+    __slots__ = ("_src", "_original")
 
-    def __init__(self, src: Sequence[int]) -> None:
+    def __init__(self, src: Sequence[int], original: str) -> None:
         self._src = src
+        self._original = original
 
     def finditer(self, text: str) -> Iterator[re.Match[str]]:
         for m in _HYPHEN_BREAK.finditer(text):
-            i = m.start() + 2
-            if text[i] == "\n" or _wide(self._src, i):
+            hyphen, letter = m.start() + 1, m.end() - 1
+            stretch = self._original[self._src[hyphen] : self._src[letter]]
+            if "\n" in stretch or "\r" in stretch:
                 yield m
 
 
@@ -289,7 +306,7 @@ class ObfuscationDetector:
         # The normalized text already applies the head+tail sampling budget
         # for oversized inputs, so there is nothing to re-sample here. The
         # dense source map is only built once a gate has opened.
-        views = deobfuscate(nt.text, _LazySourceMap(nt))
+        views = deobfuscate(nt.text, _LazySourceMap(nt), nt.original)
         findings: list[Finding] = []
         reported: set[str] = set()
         source = nt.original
