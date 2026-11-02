@@ -30,7 +30,7 @@ are already capped by `ScanBudget.max_findings`.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from .patterns import Rule
 from .types import Finding, Severity

@@ -25,7 +25,7 @@ Two properties this adapter enforces:
 """
 from __future__ import annotations
 
-from typing import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from ..pii import Entity
 

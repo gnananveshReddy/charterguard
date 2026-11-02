@@ -45,7 +45,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from threading import Lock
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 from .patterns import Rule
 from .prefilter import LiteralIndex, required_literals, split_alternation, windows
@@ -75,11 +75,11 @@ class _Variant:
 
 # Compiled programs are immutable and thread-safe, so they are shared by every
 # pipeline instance using the same rule set.
-_COMPILE_CACHE: dict[tuple[tuple[str, str], ...], "CompiledRuleSet"] = {}
+_COMPILE_CACHE: dict[tuple[tuple[str, str], ...], CompiledRuleSet] = {}
 _COMPILE_LOCK = Lock()
 
 
-def compile_rules(rules: Sequence[Rule]) -> "CompiledRuleSet":
+def compile_rules(rules: Sequence[Rule]) -> CompiledRuleSet:
     """Return a shared `CompiledRuleSet`, compiling only on first request."""
     key = tuple((r.id, r.pattern) for r in rules)
     hit = _COMPILE_CACHE.get(key)
@@ -123,9 +123,9 @@ class CompiledRuleSet:
                     literals |= triggers
                     variants.append(_Variant(rule, compiled, tuple(sorted(triggers)), False))
                 else:
-                    digit_gated = "\\d" in branch or "0-9" in branch
-                    needs_digit = needs_digit or digit_gated
-                    variants.append(_Variant(rule, compiled, (), digit_gated))
+                    gated = "\\d" in branch or "0-9" in branch
+                    needs_digit = needs_digit or gated
+                    variants.append(_Variant(rule, compiled, (), gated))
 
         self._variants = tuple(variants)
         self._index = LiteralIndex(literals, needs_digit=needs_digit)

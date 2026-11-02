@@ -5,12 +5,13 @@ keeps the expensive pass at exactly one per call regardless of detector count.
 """
 from __future__ import annotations
 
-from typing import Mapping, Protocol, Sequence, runtime_checkable
+from typing import Protocol, runtime_checkable
+from collections.abc import Mapping, Sequence
 
 from ..config import GuardrailConfig
 from ..normalize import NormalizedText
 from ..patterns import Rule, rules_for
-from ..scanner import compile_rules
+from ..scanner import CompiledRuleSet, compile_rules
 from ..types import Category, Finding, Layer, Severity
 from ..validators import digits, looks_random, luhn_ok, verhoeff_ok
 

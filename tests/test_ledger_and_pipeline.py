@@ -1,4 +1,3 @@
-import asyncio
 
 from charterguard import (
     Category,

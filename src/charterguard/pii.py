@@ -23,7 +23,8 @@ It is not. Under GDPR or HIPAA scope, treat NER as required and wire it here.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Protocol
+from collections.abc import Sequence
 
 from .config import GuardrailConfig
 from .normalize import NormalizedText

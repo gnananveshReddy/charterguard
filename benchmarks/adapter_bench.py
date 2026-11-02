@@ -20,6 +20,7 @@ Two questions this answers, both of which are easy to get wrong by intuition:
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import tempfile
 import time
@@ -79,7 +80,7 @@ def bench_metrics() -> None:
 
     loud = logging.getLogger("bench.loud")
     loud.setLevel(logging.INFO)
-    devnull = open("/dev/null", "w")
+    devnull = open(os.devnull, "w")  # noqa: SIM115 - lives for the whole benchmark
     handler = logging.StreamHandler(devnull)
     handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
     loud.addHandler(handler)
@@ -254,7 +255,7 @@ def bench_streaming() -> None:
             row.append((time.perf_counter() - start) / (reps * tokens) * 1e6)
         speedup = row[0] / row[1] if row[1] else float("inf")
         print(
-            f"  {'%d-token response' % tokens:<24}"
+            f"  {f'{tokens}-token response':<24}"
             f"{row[0]:>9.1f} -> {row[1]:>7.1f} us/token  ({speedup:>5.1f}x)"
         )
     loop.close()

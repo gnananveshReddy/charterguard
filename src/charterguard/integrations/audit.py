@@ -22,9 +22,11 @@ import json
 import os
 import threading
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Protocol
+from typing import Any, Protocol
+from collections.abc import Iterable, Mapping
 
 from ..types import Verdict
+import contextlib
 
 GENESIS_HASH = "0" * 64
 
@@ -177,17 +179,15 @@ class JsonlAuditSink:
         with self._lock:
             self._fh.close()
 
-    def __enter__(self) -> "JsonlAuditSink":
+    def __enter__(self) -> JsonlAuditSink:
         return self
 
     def __exit__(self, *exc_info: object) -> None:
         self.close()
 
     def __del__(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
     def records(self) -> Iterable[dict[str, Any]]:
         with self._path.open("r", encoding="utf-8") as fh:

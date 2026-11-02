@@ -19,7 +19,8 @@ Deliberate design choices:
 """
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 from ..ledger import _FIELDS, CounterStore
 
@@ -77,7 +78,7 @@ class RedisCounterStore:
         pipe.expire(key, self._ttl_s)
         results = pipe.execute()
         # HINCRBY replies arrive in field order; the trailing reply is EXPIRE.
-        return {f: int(v) for f, v in zip(applied.keys(), results[: len(applied)])}
+        return {f: int(v) for f, v in zip(applied.keys(), results[: len(applied)], strict=True)}
 
     def get(self, session_id: str) -> Mapping[str, int]:
         raw = self._r.hgetall(self._key(session_id)) or {}

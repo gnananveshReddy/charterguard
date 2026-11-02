@@ -28,7 +28,7 @@ cannot drift -- a test asserts they release identical text for identical input.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import AsyncIterable, AsyncIterator, Iterable, Iterator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterable, Iterable, Iterator, Sequence
 
 from .types import Action, Verdict
 
@@ -233,7 +233,7 @@ class AsyncStreamGuard:
 
     async def feed_all(
         self, tokens: AsyncIterable[str] | Iterable[str]
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncGenerator[StreamChunk, None]:
         """Guard an async (or plain) iterable of tokens.
 
         Accepts both so a caller can pass a model's async stream or a list in a

@@ -44,7 +44,7 @@ content that the component exists to keep out of logs.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping
+from collections.abc import Mapping
 
 from .config import GuardrailConfig
 # Reuse the policy engine's own ordering rather than restating it: there is no

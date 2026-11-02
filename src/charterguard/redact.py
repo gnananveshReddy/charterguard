@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Sequence
+from collections.abc import Sequence
 
 from .config import RedactionConfig
 from .types import Finding

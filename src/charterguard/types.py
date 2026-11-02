@@ -4,7 +4,8 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 
 class Category(str, Enum):
@@ -17,7 +18,7 @@ class Category(str, Enum):
     MALWARE = "malware"
     COMMAND = "command"
     RESTRICTED_TOPIC = "restricted_topic"
-    SECRET = "secret"
+    SECRET = "secret"  # noqa: S105 - category name, not a credential
     PII = "pii"
     EXFIL = "exfil"
     OUT_OF_SCOPE = "out_of_scope"

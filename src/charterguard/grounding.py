@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from .config import GuardrailConfig
 from .policy import decide
@@ -62,9 +62,7 @@ class GroundingChecker:
             return False
         if _NUMERIC.search(sentence):
             return True
-        if len(_PROPER.findall(sentence)) >= 2 and _ASSERTIVE.search(sentence):
-            return True
-        return False
+        return bool(len(_PROPER.findall(sentence)) >= 2 and _ASSERTIVE.search(sentence))
 
     def analyze(self, text: str, allowed_ids: Iterable[str]) -> GroundingReport:
         allowed = {str(a).lower() for a in allowed_ids}

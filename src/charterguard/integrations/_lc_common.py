@@ -10,7 +10,8 @@ message objects.
 from __future__ import annotations
 
 import copy
-from typing import Any, Mapping, Sequence
+from typing import Any
+from collections.abc import Mapping, Sequence
 
 # Provider roles ("user", "assistant") and LangChain types ("human", "ai") name
 # the same thing. Normalise so callers match on one vocabulary.
@@ -65,9 +66,12 @@ def content_text(content: Any) -> str:
         for block in content:
             if isinstance(block, str):
                 parts.append(block)
-            elif isinstance(block, Mapping) and isinstance(block.get("text"), str):
-                if block.get("type") in (None, "text"):
-                    parts.append(block["text"])
+            elif (
+                isinstance(block, Mapping)
+                and isinstance(block.get("text"), str)
+                and block.get("type") in (None, "text")
+            ):
+                parts.append(block["text"])
         return "\n".join(p for p in parts if p)
     return str(content)
 

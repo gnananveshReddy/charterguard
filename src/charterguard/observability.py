@@ -13,7 +13,8 @@ adapter is a dozen lines against the same three methods.
 from __future__ import annotations
 
 import threading
-from typing import Mapping, Protocol
+from typing import Protocol
+from collections.abc import Mapping
 
 from .types import Action, Category, Verdict
 

@@ -13,7 +13,8 @@ Two properties make this safe to put in a production hot path:
 from __future__ import annotations
 
 import asyncio
-from typing import Mapping, Protocol, Sequence
+from typing import Protocol, cast
+from collections.abc import Mapping, Sequence
 
 from ..config import GuardrailConfig
 from ..normalize import NormalizedText
@@ -101,7 +102,7 @@ class ModelDetector:
         key = f"{layer.value}|{content_key(text)}"
         cached = self._cache.get(key)
         if cached is not None:
-            return list(cached)  # type: ignore[arg-type]
+            return list(cast("tuple[Finding, ...]", cached))
 
         try:
             scores = await asyncio.wait_for(

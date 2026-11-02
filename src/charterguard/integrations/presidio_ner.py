@@ -21,7 +21,8 @@ time and its memory footprint is the model's. Construct it once, at startup.
 """
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Any
+from collections.abc import Mapping, Sequence
 
 from ..pii import Entity
 

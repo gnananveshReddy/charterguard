@@ -13,7 +13,8 @@ whichever protocol carries them.
 """
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 __all__ = ["OtelMetricsSink"]
 
@@ -45,7 +46,7 @@ class OtelMetricsSink:
         self._meter = meter if meter is not None else metrics.get_meter(name)
         self._counters: dict[str, Any] = {}
         self._hists: dict[str, Any] = {}
-        self._gauges: dict[str, Any] = {}
+        self._gauges: dict[str, tuple[Any, ...]] = {}
         self._unit = "ms" if unit_ms else "1"
 
     def incr(self, name: str, value: int = 1, tags: Mapping[str, str] | None = None) -> None:

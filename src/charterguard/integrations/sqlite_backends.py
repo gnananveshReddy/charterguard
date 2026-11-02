@@ -32,7 +32,8 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
+from collections.abc import Iterable, Mapping
 
 from ..ledger import _FIELDS
 from ..types import Verdict
@@ -120,13 +121,13 @@ class SqliteCounterStore:
             conn.execute("ROLLBACK")
             raise
         self._maybe_purge(now)
-        return dict(zip(_FIELDS, row))
+        return dict(zip(_FIELDS, row, strict=True))
 
     def get(self, session_id: str) -> Mapping[str, int]:
         row = self._conn().execute(
             f"SELECT {_COLS} FROM counters WHERE session_id = ?", (session_id,)
         ).fetchone()
-        return dict(zip(_FIELDS, row)) if row else {f: 0 for f in _FIELDS}
+        return dict(zip(_FIELDS, row, strict=True)) if row else {f: 0 for f in _FIELDS}
 
     def reset(self, session_id: str) -> None:
         conn = self._conn()
