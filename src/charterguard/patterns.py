@@ -510,8 +510,15 @@ def _fold_alt(words: Sequence[str], *, stem: bool) -> str:
         if folded:
             alts.append(r"\s+".join(re.escape(tok) for tok in folded.split(" ") if tok))
     body = "|".join(sorted(alts, key=len, reverse=True))  # longest first
-    return f"(?:{body})" + (r"\S*" if stem else "")
+    return f"(?:{body})" + (_STEM if stem else "")
 
+
+# Every gap is bounded. The prefilter rescans only +/- WINDOW characters
+# around a literal hit, so a rule whose match can grow past that (an
+# unbounded \S* padded with junk) would match with the prefilter off and miss
+# with it on. tests/test_prefilter.py checks each rule's maximum width.
+_STEM = r"\S{0,16}"          # inflection / case suffix
+_GAP = r"(?:\s+\S{1,30})"    # one intervening word
 
 # A token ends at whitespace, end of text, or sentence punctuation (Latin,
 # Devanagari danda, Arabic/Urdu full stop and comma).
@@ -523,17 +530,19 @@ def _indic_override(lex: _indic.Lexicon) -> str:
     noun = _fold_alt(_indic.variants(lex.lang, lex.nouns), stem=True)
     verb = _fold_alt(_indic.variants(lex.lang, lex.verbs), stem=False) + _WORD_END
     if lex.negations:
+        # Only a negation word *immediately* after the verb negates it. Tag
+        # particles and later clauses ("..., nahi to") must not suppress.
         neg = _fold_alt(lex.negations, stem=False)
-        verb += rf"(?!(?:\s+\S+)?\s+{neg}{_WORD_END})"
-    obj = rf"(?<!\S){qual}(?:\s+\S+){{0,2}}?\s+{noun}"
-    return rf"{obj}(?:\s+\S+){{0,3}}?\s+{verb}|(?<!\S){verb}(?:\s+\S+){{0,3}}?\s+{obj}"
+        verb += rf"(?!\s+{neg}{_WORD_END})"
+    obj = rf"(?<!\S){qual}{_GAP}{{0,2}}?\s+{noun}"
+    return rf"{obj}{_GAP}{{0,3}}?\s+{verb}|(?<!\S){verb}{_GAP}{{0,3}}?\s+{obj}"
 
 
 def _indic_leak(lex: _indic.LeakLexicon) -> str:
     owner = _fold_alt(lex.owners, stem=False)
     obj = _fold_alt(lex.objects, stem=True)
     verb = _fold_alt(lex.verbs, stem=False) + _WORD_END
-    return rf"(?<!\S){owner}\s+{obj}(?:\s+\S+){{0,2}}?\s+{verb}"
+    return rf"(?<!\S){owner}\s+{obj}{_GAP}{{0,2}}?\s+{verb}"
 
 
 _INDIC: tuple[Rule, ...] = tuple(

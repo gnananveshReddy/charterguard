@@ -69,7 +69,9 @@ OVERRIDES: tuple[Lexicon, ...] = (
                "नज़रअंदाज़ करें", "नज़रअंदाज़ करो", "नज़रअंदाज़ कर दो", "नजरअंदाज करें", "नजरअंदाज करो",
                "नजरअंदाज कर दो", "उपेक्षा करें", "उपेक्षा करो", "अवहेलना करें", "अवहेलना करो",
                "भूल जाओ", "भूल जाएं", "भूल जाइए", "भूलो", "भूलें", "छोड़ दो", "छोड़ दें", "मत मानो", "न मानें"),
-        negations=("मत", "न", "नहीं"),
+        # No post-verb negations: Hindi negates inside the compound verb
+        # ("अनदेखा मत करें"), which the verb list never matches, while a
+        # trailing "न" is a tag particle ("do it, won't you").
     ),
     Lexicon(
         "hinglish", "Hinglish (romanized Hindi)",
@@ -79,7 +81,7 @@ OVERRIDES: tuple[Lexicon, ...] = (
         verbs=("ignore karo", "ignore karein", "ignore karen", "ignore kar do", "ignore kardo", "ignore kijiye",
                "ignore kariye", "ignore kro", "nazarandaz karo", "najarandaz karo", "bhool jao", "bhul jao",
                "bhoolo", "bhulo", "chhod do", "chod do", "chhodo", "chodo", "mat maano", "mat mano"),
-        negations=("mat", "na", "nahi", "nahin", "mt"),
+        # As Hindi: "ignore mat karo" never matches; "ignore karo na" is a tag.
     ),
     Lexicon(
         "te", "Telugu",
@@ -127,14 +129,13 @@ OVERRIDES: tuple[Lexicon, ...] = (
         qualifiers=("અગાઉની", "અગાઉના", "પહેલાની", "પહેલાંની", "બધી", "બધા", "ઉપરની", "સિસ્ટમ"),
         nouns=("સૂચના", "નિયમ", "આદેશ"),
         verbs=("અવગણો", "અવગણના કરો", "ભૂલી જાઓ", "ભૂલી જા"),
-        negations=("નહીં", "નહિ", "ના"),
+        negations=("નહીં", "નહિ"),  # not "ના": it is also a particle
     ),
     Lexicon(
         "pa", "Punjabi",
         qualifiers=("ਪਿਛਲੀਆਂ", "ਪਿਛਲੇ", "ਪਿਛਲੀ", "ਸਾਰੀਆਂ", "ਸਾਰੇ", "ਉੱਪਰ", "ਸਿਸਟਮ"),
         nouns=("ਹਦਾਇਤ", "ਨਿਰਦੇਸ਼", "ਨਿਯਮ", "ਹੁਕਮ"),
         verbs=("ਅਣਡਿੱਠ ਕਰੋ", "ਅਣਡਿੱਠ ਕਰ ਦਿਓ", "ਨਜ਼ਰਅੰਦਾਜ਼ ਕਰੋ", "ਭੁੱਲ ਜਾਓ", "ਭੁੱਲ ਜਾਉ"),
-        negations=("ਨਾ", "ਨਹੀਂ"),
     ),
     Lexicon(
         "ur", "Urdu",
@@ -142,7 +143,6 @@ OVERRIDES: tuple[Lexicon, ...] = (
         nouns=("ہدایا", "ہدایت", "احکام", "اصول", "پرامپٹ"),
         verbs=("نظر انداز کریں", "نظر انداز کرو", "نظرانداز کریں", "نظرانداز کرو", "بھول جاؤ",
                "بھول جائیں", "بھول جائیے"),
-        negations=("مت", "نہ", "نہیں"),
     ),
 )
 

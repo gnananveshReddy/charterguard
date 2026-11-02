@@ -40,6 +40,7 @@ with the prefilter enabled and disabled and asserts identical findings.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 # Literals shorter than this are too common to be selective ("do", "on", "is").
@@ -440,6 +441,16 @@ class LiteralIndex:
         )
 
 
+def _is_word_char(ch: str) -> bool:
+    """Alphanumerics, underscore, and combining marks.
+
+    Indic vowel signs and viramas are category M, not alphanumeric; without
+    them a window edge could split "निर्देश" between a consonant and its
+    vowel sign.
+    """
+    return ch.isalnum() or ch == "_" or unicodedata.category(ch).startswith("M")
+
+
 def windows(text: str, offsets: tuple[int, ...]) -> list[tuple[int, int]]:
     """Merged, word-boundary-safe scan windows around trigger offsets.
 
@@ -452,9 +463,9 @@ def windows(text: str, offsets: tuple[int, ...]) -> list[tuple[int, int]]:
     for off in offsets:
         lo = max(0, off - WINDOW)
         hi = min(n, off + WINDOW)
-        while lo > 0 and (text[lo - 1].isalnum() or text[lo - 1] == "_"):
+        while lo > 0 and _is_word_char(text[lo - 1]):
             lo -= 1
-        while hi < n and (text[hi].isalnum() or text[hi] == "_"):
+        while hi < n and _is_word_char(text[hi]):
             hi += 1
         if spans and lo <= spans[-1][1]:
             prev_lo, prev_hi = spans[-1]
