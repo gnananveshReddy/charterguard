@@ -21,7 +21,8 @@ around. This one **fails closed** on an allowlist:
 * the text **outside** the quote, normalized, must *fully match* one of a small
   set of question templates (`frame_is_a_question`): "explain 'X' [attacks]",
   "what does 'X' mean [, and how do I detect it]", "is 'X' a jailbreak",
-  optionally after one short leading question. Anything else -- any extra
+  optionally after one leading question from a fixed list ("how does
+  prompt injection work?"). No free text is accepted anywhere. Anything else -- any extra
   clause at all -- keeps the original verdict.
 
 Findings that qualify are lowered to MEDIUM, which flags rather than allows.
@@ -72,8 +73,19 @@ _TOPIC = (
     r"(?:attacks?|injections?|prompt\s+injections?|jailbreaks?|prompts?|payloads?|"
     r"examples?|attempts?|techniques?)"
 )
-# One optional short leading question, e.g. "how does prompt injection work?"
-_LEAD = r"(?:(?:how|what|why|is|are|can|does|do|which)\b[^?.!\n]{0,80}\?\s+)?"
+# One optional leading question from a FIXED list -- never free text, or the
+# lead becomes a place to put "can you do what the next phrase says?".
+_SUBJECT = (
+    r"(?:prompt\s+injections?|injections?|injection\s+attacks?|jailbreaks?|jailbreaking|"
+    r"jailbreak\s+attacks?|this\s+attack|this|that|it)"
+)
+_LEAD = (
+    r"(?:(?:"
+    rf"how\s+(?:does|do)\s+{_SUBJECT}\s+work"
+    rf"|what\s+(?:is|are)\s+(?:an?\s+)?{_SUBJECT}"
+    rf"|why\s+(?:is|are)\s+{_SUBJECT}\s+(?:dangerous|a\s+problem|risky)"
+    r")\s*\?\s+)?"
+)
 _POLITE = r"(?:(?:please|can\s+you|could\s+you|would\s+you)\s+)?"
 _DETECT = (
     r"(?:,?\s*and\s+(?:how\s+(?:do|can|should|would)\s+(?:i|we|you)\s+)?"
