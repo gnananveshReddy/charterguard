@@ -1,7 +1,7 @@
 """Optional integrations. Nothing here is imported by the core package.
 
-Every name below is resolved lazily (PEP 562), so `import agent_guardrails` and
-even `import agent_guardrails.integrations` stay dependency-free and cold. An
+Every name below is resolved lazily (PEP 562), so `import charterguard` and
+even `import charterguard.integrations` stay dependency-free and cold. An
 optional third-party package is imported only when you touch the specific
 adapter that needs it, and a missing one raises an ImportError that names the
 extra to install.

@@ -58,7 +58,7 @@ Each of these is a deliberate, documented boundary rather than an oversight.
    in this package.
 3. **Free-text PII needs NER.** Structured PII (email, card, national IDs) is
    covered by checksum-gated rules. A name or health fact in prose is not. Wire
-   a recognizer through `agent_guardrails.pii.EntityRecognizer`.
+   a recognizer through `charterguard.pii.EntityRecognizer`.
 4. **Multilingual coverage is seed-level.** The bundled pack covers common
    override phrasings in about a dozen languages. Full multilingual detection
    requires a multilingual classifier.
@@ -125,7 +125,7 @@ Before enabling enforcement on production traffic:
 
 ## Model supply chain
 
-The optional local model tier (`agent_guardrails[onnx]`) is deliberately narrow,
+The optional local model tier (`charterguard[onnx]`) is deliberately narrow,
 because "load any model" is a vulnerability rather than a feature.
 
 **Refused, by name, before any byte is fetched:** `.bin`, `.pt`, `.pth`,

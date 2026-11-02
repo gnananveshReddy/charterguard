@@ -1,4 +1,4 @@
-"""OpenTelemetry `MetricsSink`. Requires `agent_guardrails[otel]`.
+"""OpenTelemetry `MetricsSink`. Requires `charterguard[otel]`.
 
 Prefer this over the Prometheus adapter when the rest of the service is already
 instrumented with OTel: guardrail measurements then land in the same pipeline,
@@ -19,7 +19,7 @@ __all__ = ["OtelMetricsSink"]
 
 _INSTALL = (
     "OtelMetricsSink needs the OpenTelemetry API. Install it with:\n"
-    "    pip install 'agent_guardrails[otel]'"
+    "    pip install 'charterguard[otel]'"
 )
 
 
@@ -37,7 +37,7 @@ class OtelMetricsSink:
 
     __slots__ = ("_meter", "_counters", "_hists", "_gauges", "_unit")
 
-    def __init__(self, meter: Any | None = None, *, name: str = "agent_guardrails", unit_ms: bool = True) -> None:
+    def __init__(self, meter: Any | None = None, *, name: str = "charterguard", unit_ms: bool = True) -> None:
         try:
             from opentelemetry import metrics  # type: ignore[import-not-found]
         except ImportError as exc:  # pragma: no cover - env dependent

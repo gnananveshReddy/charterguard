@@ -10,7 +10,7 @@ building a graph. Where `langchain-core` happens to be installed, real
 
 Wiring, smallest useful graph::
 
-    from agent_guardrails.integrations.langgraph import (
+    from charterguard.integrations.langgraph import (
         guard_input_node, guard_output_node, guardrail_router, refusal_node,
     )
 
@@ -546,7 +546,7 @@ def _langgraph_interrupt() -> Callable[[Any], Any]:
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
             "approval_node() needs langgraph's interrupt(): "
-            "pip install 'agent-guardrails[langgraph]', or pass interrupt_fn=... "
+            "pip install 'charterguard[langgraph]', or pass interrupt_fn=... "
             "to supply your own approval mechanism."
         ) from exc
     return interrupt

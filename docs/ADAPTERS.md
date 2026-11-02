@@ -25,16 +25,16 @@ everything here if you prefer.
 ## Install matrix
 
 ```bash
-pip install agent_guardrails                 # core + every stdlib adapter
-pip install 'agent_guardrails[redis]'        # cross-host session ceilings
-pip install 'agent_guardrails[prometheus]'   # Prometheus metrics
-pip install 'agent_guardrails[otel]'         # OpenTelemetry metrics
-pip install 'agent_guardrails[spacy]'        # NER: names, locations
-pip install 'agent_guardrails[presidio]'     # NER + national-ID recognisers
-pip install 'agent_guardrails[onnx]'         # local model tier (no torch)
-pip install 'agent_guardrails[fastapi]'      # ASGI middleware
-pip install 'agent_guardrails[langchain]'    # LangChain runnables, tools, retriever
-pip install 'agent_guardrails[langgraph]'    # LangGraph: nodes need no import;
+pip install charterguard                 # core + every stdlib adapter
+pip install 'charterguard[redis]'        # cross-host session ceilings
+pip install 'charterguard[prometheus]'   # Prometheus metrics
+pip install 'charterguard[otel]'         # OpenTelemetry metrics
+pip install 'charterguard[spacy]'        # NER: names, locations
+pip install 'charterguard[presidio]'     # NER + national-ID recognisers
+pip install 'charterguard[onnx]'         # local model tier (no torch)
+pip install 'charterguard[fastapi]'      # ASGI middleware
+pip install 'charterguard[langchain]'    # LangChain runnables, tools, retriever
+pip install 'charterguard[langgraph]'    # LangGraph: nodes need no import;
                                              # only approval_node() uses it
 ```
 
@@ -45,7 +45,7 @@ python -m spacy download en_core_web_sm      # spacy adapter
 python -m spacy download en_core_web_lg      # presidio's default
 ```
 
-Imports are lazy (PEP 562). `import agent_guardrails.integrations` pulls in none
+Imports are lazy (PEP 562). `import charterguard.integrations` pulls in none
 of these -- a test asserts that `redis`, `prometheus_client`, `opentelemetry`,
 `spacy`, `onnxruntime`, `fastapi`, `langchain_core` and `langgraph` are absent
 from `sys.modules` afterwards.
@@ -68,7 +68,7 @@ objects; where it is not, they emit role dicts, which langgraph coerces anyway.
 
 ```python
 from langgraph.graph import StateGraph, MessagesState
-from agent_guardrails.integrations.langgraph import (
+from charterguard.integrations.langgraph import (
     GuardrailState, guard_input_node, guard_output_node,
     guard_tool_calls_node, guard_tool_results_node,
     guardrail_router, refusal_node, thread_session_id,
@@ -149,7 +149,7 @@ frameworks quarantine on identical rules and emit identical audit rows -- and
 the behaviour is tested without either package installed.
 
 ```python
-from agent_guardrails.integrations.langchain import (
+from charterguard.integrations.langchain import (
     GuardedRetriever, guard_input, guard_output, guarded_tools,
 )
 
@@ -202,13 +202,13 @@ instead.
 
 ```python
 # LangChain -- a RunnableGenerator, so chunks flow as they arrive
-from agent_guardrails.integrations.langchain import guard_output_stream
+from charterguard.integrations.langchain import guard_output_stream
 chain = guard_input(pipeline) | prompt | model | guard_output_stream(pipeline)
 async for chunk in chain.astream("...", config={"configurable": {"session_id": "u-1"}}):
     await send(chunk)
 
 # LangGraph -- wraps stream_mode="messages"
-from agent_guardrails.integrations.langgraph import guard_message_stream
+from charterguard.integrations.langgraph import guard_message_stream
 stream = graph.astream(state, config, stream_mode="messages")
 async for chunk in guard_message_stream(pipeline, stream, session_id=sid):
     await send(chunk.text)          # blocked chunks carry the refusal
@@ -267,7 +267,7 @@ those, because LangGraph has durable interrupts and so is the one place it can b
 done properly.
 
 ```python
-from agent_guardrails.integrations.langgraph import approval_node, guardrail_router
+from charterguard.integrations.langgraph import approval_node, guardrail_router
 
 g.add_node("guard_calls", guard_tool_calls_node(pipeline))
 g.add_node("approve", approval_node())            # on_flagged=True to review FLAGs too
@@ -447,8 +447,8 @@ component in a system that should be doing that.
 So `[onnx]` supports any model that fits a verifiable contract:
 
 ```python
-from agent_guardrails.integrations.onnx_model import FileSpec, OnnxModelSpec, OnnxModelScorer
-from agent_guardrails.types import Category
+from charterguard.integrations.onnx_model import FileSpec, OnnxModelSpec, OnnxModelScorer
+from charterguard.types import Category
 
 spec = OnnxModelSpec(
     repo_id="your-org/injection-classifier-onnx",
@@ -520,8 +520,8 @@ package deliberately leaves open.
 distribution lives.
 
 ```python
-from agent_guardrails import RuleHealth
-from agent_guardrails.patterns import RULES
+from charterguard import RuleHealth
+from charterguard.patterns import RULES
 
 health = RuleHealth(RULES)          # the inventory is the point -- see below
 verdict = pipeline.check_input(text)
@@ -556,7 +556,7 @@ policy can be evaluated against findings that have *already* been computed,
 instead of splitting traffic and scanning twice.
 
 ```python
-from agent_guardrails import ShadowPolicy
+from charterguard import ShadowPolicy
 
 shadow = ShadowPolicy(baseline=cfg, candidates={"stricter": GuardrailConfig.strict()})
 verdict = pipeline.check_input(text)      # one scan, behaviour unchanged

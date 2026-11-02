@@ -10,17 +10,17 @@ from __future__ import annotations
 import random
 import re
 
-from agent_guardrails.patterns import RULES, rules_for
-from agent_guardrails.prefilter import (
+from charterguard.patterns import RULES, rules_for
+from charterguard.prefilter import (
     LiteralIndex,
     _trie_pattern,
     required_literals,
     split_alternation,
     windows,
 )
-from agent_guardrails.scanner import CompiledRuleSet
-from agent_guardrails.normalize import normalize
-from agent_guardrails.types import Layer
+from charterguard.scanner import CompiledRuleSet
+from charterguard.normalize import normalize
+from charterguard.types import Layer
 
 CORPUS = [
     "",
@@ -80,7 +80,7 @@ def test_prefiltered_scan_equals_exhaustive_scan():
 
 def test_prefilter_equivalence_holds_for_validator_gated_rules():
     """Validators run after the prefilter, so check the combination too."""
-    from agent_guardrails.detectors.base import RuleDetector
+    from charterguard.detectors.base import RuleDetector
 
     rs = CompiledRuleSet(RULES)
     keep = RuleDetector._keep

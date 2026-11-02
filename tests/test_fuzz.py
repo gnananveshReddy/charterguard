@@ -22,9 +22,9 @@ import random
 import time
 import unicodedata
 
-from agent_guardrails import GuardrailPipeline
-from agent_guardrails.normalize import normalize
-from agent_guardrails.patterns import RULES
+from charterguard import GuardrailPipeline
+from charterguard.normalize import normalize
+from charterguard.patterns import RULES
 
 ALPHABETS = (
     "abcdefghijklmnopqrstuvwxyz0123456789 \t\n",

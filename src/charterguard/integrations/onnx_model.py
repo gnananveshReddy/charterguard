@@ -1,4 +1,4 @@
-"""Universal local-model tier: pinned, checksummed ONNX. `agent_guardrails[onnx]`.
+"""Universal local-model tier: pinned, checksummed ONNX. `charterguard[onnx]`.
 
 "Any model should just work" is the right goal and the wrong implementation.
 Made literal, it means downloading whatever a repo name resolves to today and
@@ -56,7 +56,7 @@ __all__ = [
 
 _INSTALL = (
     "The local ONNX tier needs onnxruntime and tokenizers. Install with:\n"
-    "    pip install 'agent_guardrails[onnx]'"
+    "    pip install 'charterguard[onnx]'"
 )
 
 # Extensions that are safe to fetch: protobuf graphs and JSON/text tokenizers.
@@ -206,7 +206,7 @@ def _download(url: str, dest: Path, expected: str, timeout_s: float) -> None:
     tmp = Path(tmp_name)
     os.close(tmp_fd)
     try:
-        req = urllib.request.Request(url, headers={"user-agent": "agent-guardrails/1.3"})
+        req = urllib.request.Request(url, headers={"user-agent": "charterguard/1.3"})
         h = hashlib.sha256()
         total = 0
         with urllib.request.urlopen(req, timeout=timeout_s) as resp, tmp.open("wb") as out:
@@ -254,7 +254,7 @@ def ensure_local(
     must already be present and correct, or this raises.
     """
     root = Path(cache_dir) if cache_dir else Path(
-        os.environ.get("AGENT_GUARDRAILS_MODEL_CACHE", Path.home() / ".cache" / "agent_guardrails")
+        os.environ.get("AGENT_GUARDRAILS_MODEL_CACHE", Path.home() / ".cache" / "charterguard")
     )
     target = root / spec.cache_key()
     for fs in spec.files:

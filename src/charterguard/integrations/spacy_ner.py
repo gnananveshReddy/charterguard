@@ -1,8 +1,8 @@
-"""spaCy `EntityRecognizer`. Requires `agent_guardrails[spacy]` plus a model.
+"""spaCy `EntityRecognizer`. Requires `charterguard[spacy]` plus a model.
 
 Install is two steps, and the second one is the one people forget:
 
-    pip install 'agent_guardrails[spacy]'
+    pip install 'charterguard[spacy]'
     python -m spacy download en_core_web_sm
 
 Model choice is a real precision/latency decision, not a default to accept:
@@ -33,7 +33,7 @@ __all__ = ["SpacyEntityRecognizer", "SPACY_LABEL_MAP"]
 
 _INSTALL = (
     "SpacyEntityRecognizer needs spaCy and a model. Install with:\n"
-    "    pip install 'agent_guardrails[spacy]'\n"
+    "    pip install 'charterguard[spacy]'\n"
     "    python -m spacy download en_core_web_sm"
 )
 

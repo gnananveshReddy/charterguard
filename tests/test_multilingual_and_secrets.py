@@ -6,9 +6,9 @@ stops compiling to anything matchable fails here.
 """
 from __future__ import annotations
 
-from agent_guardrails import GuardrailPipeline
-from agent_guardrails.patterns import RULES, _ML_PHRASES
-from agent_guardrails.types import Action, Category
+from charterguard import GuardrailPipeline
+from charterguard.patterns import RULES, _ML_PHRASES
+from charterguard.types import Action, Category
 
 
 def _pipeline() -> GuardrailPipeline:

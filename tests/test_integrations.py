@@ -24,25 +24,25 @@ from pathlib import Path
 
 import pytest
 
-from agent_guardrails.integrations.audit import verify_chain
-from agent_guardrails.integrations.heuristics import (
+from charterguard.integrations.audit import verify_chain
+from charterguard.integrations.heuristics import (
     GazetteerEntityRecognizer,
     KeywordIntentClassifier,
 )
-from agent_guardrails.integrations.logging_metrics import (
+from charterguard.integrations.logging_metrics import (
     ConsoleMetricsSink,
     LoggingMetricsSink,
     StatsdMetricsSink,
 )
-from agent_guardrails.integrations.onnx_model import (
+from charterguard.integrations.onnx_model import (
     FileSpec,
     ModelIntegrityError,
     OnnxModelSpec,
     ensure_local,
 )
-from agent_guardrails.integrations.sqlite_backends import SqliteAuditSink, SqliteCounterStore
-from agent_guardrails.ledger import _FIELDS
-from agent_guardrails.types import Action, Category, Layer, Verdict
+from charterguard.integrations.sqlite_backends import SqliteAuditSink, SqliteCounterStore
+from charterguard.ledger import _FIELDS
+from charterguard.types import Action, Category, Layer, Verdict
 
 # Tests write databases and model caches here rather than into the repo, and
 # work identically under pytest (which passes a real tmp_path) or the bundled
@@ -394,7 +394,7 @@ def _parse(raw, categories):
 
 
 def test_http_model_scorer_maps_response_to_categories():
-    from agent_guardrails.integrations.http_adapters import HttpModelScorer
+    from charterguard.integrations.http_adapters import HttpModelScorer
 
     server, url = _serve()
     try:
@@ -410,7 +410,7 @@ def test_http_model_scorer_maps_response_to_categories():
 
 
 def test_http_model_scorer_retries_transient_failure():
-    from agent_guardrails.integrations.http_adapters import HttpModelScorer
+    from charterguard.integrations.http_adapters import HttpModelScorer
 
     server, url = _serve()
     _Handler.fail_times = 1
@@ -428,7 +428,7 @@ def test_http_model_scorer_raises_so_fail_policy_decides():
     """The adapter must not swallow transport errors: ModelDetector resolves
     them through fail_closed, and a silent zero-score would mean fail-open in a
     deployment that asked for fail-closed."""
-    from agent_guardrails.integrations.http_adapters import HttpError, HttpModelScorer
+    from charterguard.integrations.http_adapters import HttpError, HttpModelScorer
 
     scorer = HttpModelScorer(
         "http://127.0.0.1:9/score", parse=_parse, timeout_s=0.25, max_retries=0,
@@ -439,14 +439,14 @@ def test_http_model_scorer_raises_so_fail_policy_decides():
 
 
 def test_http_adapters_refuse_cleartext_by_default():
-    from agent_guardrails.integrations.http_adapters import HttpModelScorer
+    from charterguard.integrations.http_adapters import HttpModelScorer
 
     with pytest.raises(ValueError):
         HttpModelScorer("http://moderation.example.com/score", parse=_parse)
 
 
 def test_http_adapters_never_send_credentials_over_cleartext():
-    from agent_guardrails.integrations.http_adapters import HttpModelScorer
+    from charterguard.integrations.http_adapters import HttpModelScorer
 
     with pytest.raises(ValueError):
         HttpModelScorer(
@@ -530,17 +530,17 @@ def test_ensure_local_deletes_and_refuses_a_corrupted_cache_entry(tmp_path=None)
 
 # ------------------------------------------------------------ import hygiene
 def test_integrations_import_pulls_in_no_optional_dependency():
-    """The core promise: `pip install agent_guardrails` stays dependency-free,
+    """The core promise: `pip install charterguard` stays dependency-free,
     and merely importing the integrations package does not change that."""
     import importlib
 
-    importlib.import_module("agent_guardrails.integrations")
+    importlib.import_module("charterguard.integrations")
     for optional in ("redis", "prometheus_client", "opentelemetry", "spacy", "onnxruntime", "fastapi"):
         assert optional not in sys.modules, f"{optional} was imported eagerly"
 
 
 def test_missing_extra_raises_an_actionable_import_error():
-    import agent_guardrails.integrations as integ
+    import charterguard.integrations as integ
 
     for name, extra in (
         ("RedisCounterStore", "redis"),
@@ -559,13 +559,13 @@ def test_missing_extra_raises_an_actionable_import_error():
         try:
             cls() if name != "OnnxModelScorer" else cls
         except ImportError as exc:
-            assert f"agent_guardrails[{extra}]" in str(exc)
+            assert f"charterguard[{extra}]" in str(exc)
         except Exception:
             pass  # constructed far enough to need real config; the guard is not the issue
 
 
 def test_stdlib_adapters_are_reachable_from_the_package_root():
-    import agent_guardrails.integrations as integ
+    import charterguard.integrations as integ
 
     for name in (
         "LoggingMetricsSink",

@@ -1,4 +1,4 @@
-"""Cross-host ledger backend. Requires `agent_guardrails[redis]`.
+"""Cross-host ledger backend. Requires `charterguard[redis]`.
 
 This is the store that makes a per-session ceiling *actually* a ceiling when
 the service runs on more than one host. The contract is one atomic multi-field
@@ -27,7 +27,7 @@ __all__ = ["RedisCounterStore", "FallbackCounterStore"]
 
 _INSTALL = (
     "RedisCounterStore needs the redis client. Install it with:\n"
-    "    pip install 'agent_guardrails[redis]'"
+    "    pip install 'charterguard[redis]'"
 )
 
 

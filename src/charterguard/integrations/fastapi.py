@@ -1,6 +1,6 @@
 """FastAPI wiring.
 
-Kept out of the core package so `agent_guardrails` stays dependency-free:
+Kept out of the core package so `charterguard` stays dependency-free:
 importing this module is the only thing that requires fastapi.
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ try:
     from fastapi import Request, status
     from fastapi.responses import JSONResponse
 except ImportError as exc:  # pragma: no cover
-    raise ImportError("agent_guardrails.integrations.fastapi requires fastapi") from exc
+    raise ImportError("charterguard.integrations.fastapi requires fastapi") from exc
 
 from ..exceptions import GuardrailBlocked
 from ..pipeline import GuardrailPipeline

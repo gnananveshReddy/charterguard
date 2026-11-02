@@ -1,9 +1,9 @@
-"""agent_guardrails -- a framework-agnostic guardrail pipeline for agent harnesses.
+"""charterguard -- a framework-agnostic guardrail pipeline for agent harnesses.
 
 Zero runtime dependencies. Drop it into any Python project; wire the five trust
 boundaries; keep enforcement out of your prompts.
 
-    from agent_guardrails import GuardrailPipeline, GuardrailConfig, Charter
+    from charterguard import GuardrailPipeline, GuardrailConfig, Charter
 
     pipeline = GuardrailPipeline(
         GuardrailConfig.report_only(),        # phase 1 of rollout
@@ -70,7 +70,7 @@ from .types import (
     Verdict,
 )
 
-__version__ = "1.6.0"
+__version__ = "0.1.0"
 
 __all__ = [
     "__version__",
@@ -157,8 +157,8 @@ __all__ = [
 
 
 # --------------------------------------------------------------------- lazy tier
-# The embedding tier lives behind PEP 562 lazy attribute access. `agent_guardrails`
-# stays a cold, dependency-free import; `agent_guardrails.semantic` (and the numpy
+# The embedding tier lives behind PEP 562 lazy attribute access. `charterguard`
+# stays a cold, dependency-free import; `charterguard.semantic` (and the numpy
 # accelerator it will use if present) is loaded on first touch of one of these
 # names. Measured: eager import cost 1398 ms and left numpy in sys.modules, lazy
 # import costs 3 ms and does not.

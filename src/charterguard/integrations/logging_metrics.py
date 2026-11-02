@@ -49,7 +49,7 @@ class LoggingMetricsSink:
     """Structured measurement records through stdlib `logging`.
 
     Wire your aggregator to the logger name (default
-    ``agent_guardrails.metrics``). Each record carries ``gr_metric``,
+    ``charterguard.metrics``). Each record carries ``gr_metric``,
     ``gr_kind``, ``gr_value`` and ``gr_tags`` in ``extra``, so a JSON formatter
     emits queryable fields instead of a prose string.
     """
@@ -58,7 +58,7 @@ class LoggingMetricsSink:
 
     def __init__(
         self,
-        logger_name: str = "agent_guardrails.metrics",
+        logger_name: str = "charterguard.metrics",
         *,
         level: int = logging.INFO,
         sample_rate: float = 1.0,

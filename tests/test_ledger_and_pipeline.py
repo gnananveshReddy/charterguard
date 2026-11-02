@@ -1,6 +1,6 @@
 import asyncio
 
-from agent_guardrails import (
+from charterguard import (
     Category,
     GuardrailBlocked,
     GuardrailConfig,
@@ -8,9 +8,9 @@ from agent_guardrails import (
     SessionLedger,
     VolumeCeilings,
 )
-from agent_guardrails.config import ModelTier
-from agent_guardrails.integrations.audit import event_payload, guardrail_rows
-from agent_guardrails.types import Layer
+from charterguard.config import ModelTier
+from charterguard.integrations.audit import event_payload, guardrail_rows
+from charterguard.types import Layer
 
 
 def test_ledger_fires_on_cumulative_rows_not_single_request():

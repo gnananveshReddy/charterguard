@@ -1,5 +1,5 @@
-from agent_guardrails import Category, GuardrailConfig, GuardrailPipeline
-from agent_guardrails.validators import luhn_ok, looks_random, verhoeff_ok
+from charterguard import Category, GuardrailConfig, GuardrailPipeline
+from charterguard.validators import luhn_ok, looks_random, verhoeff_ok
 
 STRICT = GuardrailConfig.strict()
 

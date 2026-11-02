@@ -10,15 +10,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agent_guardrails import GuardrailPipeline
-from agent_guardrails.integrations.audit import (
+from charterguard import GuardrailPipeline
+from charterguard.integrations.audit import (
     GENESIS_HASH,
     JsonlAuditSink,
     NullAuditSink,
     verify_chain,
 )
-from agent_guardrails.observability import InMemoryMetrics
-from agent_guardrails.types import Action, Layer, Verdict
+from charterguard.observability import InMemoryMetrics
+from charterguard.types import Action, Layer, Verdict
 
 
 def _verdict(action: Action = Action.BLOCK) -> Verdict:

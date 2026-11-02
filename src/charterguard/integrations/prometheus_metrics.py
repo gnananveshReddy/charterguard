@@ -1,4 +1,4 @@
-"""Prometheus `MetricsSink`. Requires `agent_guardrails[prometheus]`.
+"""Prometheus `MetricsSink`. Requires `charterguard[prometheus]`.
 
 One structural mismatch has to be handled rather than wished away: the
 guardrail `MetricsSink` protocol accepts free-form tags per call, while a
@@ -24,7 +24,7 @@ __all__ = ["PrometheusMetricsSink"]
 
 _INSTALL = (
     "PrometheusMetricsSink needs prometheus-client. Install it with:\n"
-    "    pip install 'agent_guardrails[prometheus]'"
+    "    pip install 'charterguard[prometheus]'"
 )
 
 # Latency in this system spans sub-millisecond rule scans to multi-second model

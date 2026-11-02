@@ -1,4 +1,4 @@
-from agent_guardrails import (
+from charterguard import (
     Category,
     GuardrailConfig,
     GuardrailPipeline,

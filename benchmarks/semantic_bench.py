@@ -28,15 +28,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from agent_guardrails import GuardrailPipeline  # noqa: E402
-from agent_guardrails.semantic import (  # noqa: E402
+from charterguard import GuardrailPipeline  # noqa: E402
+from charterguard.semantic import (  # noqa: E402
     CascadingScorer,
     HashingEmbedder,
     PrototypeBank,
     SemanticScorer,
     numpy_available,
 )
-from agent_guardrails.types import Category, Layer  # noqa: E402
+from charterguard.types import Category, Layer  # noqa: E402
 
 CATS = [
     "Harassment", "Malware", "Physical harm", "Economic harm", "Fraud",
@@ -258,7 +258,7 @@ def latency(bank, embedder, heldout):
 
 
 def breakeven():
-    from agent_guardrails.semantic import cascade_breakeven, cascade_latency_ms
+    from charterguard.semantic import cascade_breakeven, cascade_latency_ms
 
     print("\n" + "=" * 66)
     print("BREAK-EVEN: when is stage 2 worth adding at all?")

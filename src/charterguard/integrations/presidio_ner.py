@@ -1,4 +1,4 @@
-"""Microsoft Presidio `EntityRecognizer`. Requires `agent_guardrails[presidio]`.
+"""Microsoft Presidio `EntityRecognizer`. Requires `charterguard[presidio]`.
 
 Choose Presidio over raw spaCy when you want the *recognisers*, not just the
 NER: it bundles country-specific ID logic (US SSN, UK NHS number, AU TFN, IN
@@ -7,7 +7,7 @@ span's score when supporting words are nearby ("SSN:" next to a 9-digit
 number).
 
 Overlap with the bundled rules is real and worth deciding deliberately.
-`agent_guardrails` already detects structured PII (email, phone, card with
+`charterguard` already detects structured PII (email, phone, card with
 Luhn, IBAN, IP) with no dependency. Two sane configurations:
 
   * **Names only** (default here): pass `entities=("PERSON",)` and keep the
@@ -29,7 +29,7 @@ __all__ = ["PresidioEntityRecognizer", "PRESIDIO_LABEL_MAP"]
 
 _INSTALL = (
     "PresidioEntityRecognizer needs presidio-analyzer and a spaCy model. Install with:\n"
-    "    pip install 'agent_guardrails[presidio]'\n"
+    "    pip install 'charterguard[presidio]'\n"
     "    python -m spacy download en_core_web_lg"
 )
 

@@ -1,4 +1,4 @@
-# agent-guardrails
+# charterguard
 
 A framework-agnostic guardrail pipeline for LLM agent harnesses: prompt-injection
 and jailbreak detection, harmful-content and destructive-command rules, scope
@@ -24,7 +24,7 @@ quarantined if they carry instructions.
 
 ## Install
 
-Copy `src/agent_guardrails` into your project, or install the package:
+Copy `src/charterguard` into your project, or install the package:
 
 ```bash
 pip install -e .                 # core + every stdlib adapter, no dependencies
@@ -46,7 +46,7 @@ with measured per-call costs.
 ## Quick start
 
 ```python
-from agent_guardrails import GuardrailPipeline, GuardrailConfig, Charter
+from charterguard import GuardrailPipeline, GuardrailConfig, Charter
 
 charter = Charter(
     agent_id="policy-assistant",
@@ -99,8 +99,8 @@ final_text = guardrails.refusal(out) if out.blocked else (out.sanitized or answe
 
 ```python
 from fastapi import Depends, FastAPI
-from agent_guardrails import GuardrailPipeline, Verdict
-from agent_guardrails.integrations.fastapi import (
+from charterguard import GuardrailPipeline, Verdict
+from charterguard.integrations.fastapi import (
     guard_response,
     input_guard,
     install_exception_handler,
@@ -132,11 +132,11 @@ so a graph and a chain quarantine on the same rules and emit the same audit rows
 
 ```python
 # LangChain: guards compose with `|`
-from agent_guardrails.integrations.langchain import guard_input, guard_output
+from charterguard.integrations.langchain import guard_input, guard_output
 chain = guard_input(pipeline) | prompt | model | guard_output(pipeline)
 
 # LangGraph: guards are nodes, and the router enforces
-from agent_guardrails.integrations.langgraph import (
+from charterguard.integrations.langgraph import (
     guard_input_node, guardrail_router, refusal_node,
 )
 g.add_node("guard_in", guard_input_node(pipeline))
@@ -212,7 +212,7 @@ than blocked, and restricted topics only report.
 verdicts into storage rows and hash-chained events:
 
 ```python
-from agent_guardrails.integrations.audit import event_payload, guardrail_rows
+from charterguard.integrations.audit import event_payload, guardrail_rows
 
 rows = guardrail_rows(verdict, run_id=run_id, step=3,
                       principal_id=user_id, agent_identity="policy-assistant@3")

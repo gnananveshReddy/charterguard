@@ -1,4 +1,4 @@
-from agent_guardrails.normalize import normalize
+from charterguard.normalize import normalize
 
 
 def test_ascii_fast_path_lowercases_and_collapses():

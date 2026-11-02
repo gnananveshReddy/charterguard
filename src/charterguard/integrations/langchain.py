@@ -1,6 +1,6 @@
 """LangChain wiring: guard Runnables, a guarded retriever, and guarded tools.
 
-Kept out of the core package so `agent_guardrails` stays dependency-free:
+Kept out of the core package so `charterguard` stays dependency-free:
 importing this module is the only thing that requires langchain-core.
 
 The guard decisions live in `_lc_guards`, which imports nothing third-party.
@@ -10,7 +10,7 @@ langchain-core installed.
 
 Wiring a chain::
 
-    from agent_guardrails.integrations.langchain import guard_input, guard_output
+    from charterguard.integrations.langchain import guard_input, guard_output
 
     chain = guard_input(pipeline) | prompt | model | guard_output(pipeline)
     answer = await chain.ainvoke("hello", config={"configurable": {"session_id": "u-1"}})
@@ -33,8 +33,8 @@ try:
     from langchain_core.tools import BaseTool
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
-        "agent_guardrails.integrations.langchain requires langchain-core: "
-        "pip install 'agent-guardrails[langchain]'"
+        "charterguard.integrations.langchain requires langchain-core: "
+        "pip install 'charterguard[langchain]'"
     ) from exc
 
 from ..pipeline import GuardrailPipeline

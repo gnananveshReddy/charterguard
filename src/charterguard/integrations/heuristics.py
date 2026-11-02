@@ -20,7 +20,7 @@ Measured ceilings, not aspirations:
     place names -- noisy redaction trains users to ignore redaction.
 
 If GDPR or HIPAA scope applies, treat these as placeholders and install
-`agent_guardrails[spacy]` or `agent_guardrails[presidio]`.
+`charterguard[spacy]` or `charterguard[presidio]`.
 """
 from __future__ import annotations
 

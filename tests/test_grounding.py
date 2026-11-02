@@ -1,5 +1,5 @@
-from agent_guardrails import GuardrailConfig, GuardrailPipeline
-from agent_guardrails.grounding import GroundingChecker
+from charterguard import GuardrailConfig, GuardrailPipeline
+from charterguard.grounding import GroundingChecker
 
 CFG = GuardrailConfig.strict()
 
