@@ -26,6 +26,9 @@ Dependency tiers, so you can see what a name costs before you use it:
     [spacy]      -- SpacyEntityRecognizer
     [presidio]   -- PresidioEntityRecognizer
     [onnx]       -- OnnxModelScorer, OnnxEmbedder, OnnxTextClassifier
+    [openai-agents]    -- integrations.openai_agents: input_guardrail,
+                          output_guardrail, tool_input_guardrail, tool_output_guardrail
+    [claude-agent-sdk] -- claude_agent_hooks
 """
 from __future__ import annotations
 
@@ -74,6 +77,9 @@ _LAZY: dict[str, str] = {
     "McpServer": "mcp",
     "serve_stdio": "mcp",
     "guard_mcp_result": "mcp",
+    # agent SDKs: the SDK is imported only when a factory is called. The
+    # OpenAI Agents guardrails live in .openai_agents (input_guardrail, ...).
+    "claude_agent_hooks": "claude_agent_sdk",
     # optional third-party
     "guardrail_middleware": "fastapi",
     "GuardedRetriever": "langchain",
@@ -114,6 +120,7 @@ if TYPE_CHECKING:  # give type checkers the real symbols without a runtime cost
         verify_chain,
     )
     from .heuristics import GazetteerEntityRecognizer, KeywordIntentClassifier  # noqa: F401
+    from .claude_agent_sdk import claude_agent_hooks  # noqa: F401
     from .mcp import McpServer, guard_mcp_result, serve_stdio  # noqa: F401
     from .langgraph import (  # noqa: F401
         GUARDRAIL_KEY,
