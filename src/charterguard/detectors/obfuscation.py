@@ -12,34 +12,39 @@ are only meaningful to a reader:
 * rot13, which is a cipher rather than an encoding, so the encoded-payload
   detector's printable-ratio gate cannot tell it from prose.
 
-This detector builds a *separate* de-obfuscated view of the original text,
-keeping a per-character map back to it, and re-scans only windows around the
-characters it changed, with only the instruction-shaped rule categories. A
-match is reported only if it overlaps a changed character -- the concealment
-is what made it invisible to the rule detector, and is itself the signal, so
-severity is raised the same way the encoded detector raises it.
+This detector works on the **normalized** text, so it inherits confusable
+folding, invisible-character stripping and fullwidth folding: ``１gn０r３`` and
+``i\\u200b g n o r e`` reach it as plain ASCII. (Working on the original text
+instead would be a parser differential -- every normalizer defence would be
+one character away from bypassing this detector.) It builds a separate
+de-obfuscated view with a per-character map back to the original, re-scans
+only windows around the characters it changed with the instruction-shaped
+rule categories, and reports a match only if it overlaps a change. The
+concealment is itself the signal, so severity is raised the same way the
+encoded detector raises it.
 
-Cost control: each technique has a one-pass C-speed gate, and work is
-proportional to the obfuscated region, not the document. Ordinary prose trips
-no gate and pays a handful of regex searches; a stray ``mp3`` or ``v2`` opens
-the leetspeak gate but costs one small window.
+Word gaps survive normalization even though whitespace runs are collapsed: a
+collapsed run shows up in the offset map as a source jump greater than one.
+Letter spacing uses that to keep ``i g n o r e  a l l`` as two words.
 
-Limits: letter spacing is undone within a run of single letters. Words must
-still be separated by something else (two spaces, a newline, punctuation);
-``i g n o r e a l l`` with uniform single spaces cannot be segmented without a
-dictionary, and is left to the model tier.
+Cost control: each technique has a C-speed gate on a byte "shape" of the text,
+and work is proportional to the obfuscated region, not the document.
+
+Limits: words inside a letter-spaced run must be separated by something other
+than a single space; ``i g n o r e a l l`` cannot be segmented without a
+dictionary and is left to the model tier.
 """
 from __future__ import annotations
 
 import codecs
 import re
 from bisect import bisect_left
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
+from typing import Protocol
 
 from ..config import GuardrailConfig
-from ..normalize import normalize
-from ..normalize import NormalizedText
+from ..normalize import NormalizedText, normalize
 from ..patterns import rules_for
 from ..scanner import compile_rules
 from ..types import Category, Finding, Layer, Severity
@@ -53,6 +58,7 @@ _CATEGORIES = (Category.INJECTION, Category.JAILBREAK, Category.EXFIL, Category.
 # overlaps the change.
 _WINDOW = 160
 _MAX_FINDINGS = 8
+
 
 # ------------------------------------------------------------------ gates
 # Python's `re` costs ~0.1 us/char on patterns that start with a character
@@ -79,32 +85,31 @@ _LEET_SHAPES = (b"a1a", b"1a1")
 # Two consecutive single-letter tokens. English has lone "a" and "I", rarely
 # two in a row; "i g n o r e" has five.
 _SPACED_SHAPE = b".a.a."
-_HYPHEN_MARKERS = ("-\n", "-\r\n", "- \n")
-# Common words as they appear under rot13, matched on lowercased text: "the",
-# "and", "you", "all", "ignore", "previous", "instructions", "system", "prompt".
+# The normalizer keeps a lone newline but collapses "-\r\n" or "- \n" to "- ".
+_HYPHEN_MARKERS = ("-\n", "- ")
+# Common words as they appear under rot13 (the text is already lowercased):
+# "the", "and", "you", "all", "ignore", "previous", "instructions", "system",
+# "prompt".
 _ROT13_MARKERS = (" gur ", " naq ", " lbh ", " nyy ", "vtaber", "cerivbhf", "vafgehpgvbaf", "flfgrz", "cebzcg")
 
-_SPACED_RUN = re.compile(r"(?<![A-Za-z])(?:[A-Za-z][ ._*|\-]){2,}[A-Za-z](?![A-Za-z])")
-_HYPHEN_BREAK = re.compile(r"[A-Za-z]-[ \t]*\r?\n[ \t]*[A-Za-z]")
-_ROT13_WORDS = re.compile(
-    r"\b(?:gur|naq|lbh|vtaber|cerivbhf|vafgehpgvbaf|flfgrz|cebzcg|nyy)\b", re.IGNORECASE
-)
+_SPACED_RUN = re.compile(r"(?<![a-z])(?:[a-z][ ._*|\-]){2,}[a-z](?![a-z])")
+_HYPHEN_BREAK = re.compile(r"[a-z]-[ \n][a-z]")
+_ROT13_WORDS = re.compile(r"\b(?:gur|naq|lbh|vtaber|cerivbhf|vafgehpgvbaf|flfgrz|cebzcg|nyy)\b")
 
 # "!" is deliberately not a leet character: it ends sentences, and folding it
 # would turn "instructions!" into "instructionsi" and break the very match the
 # view exists to make.
-_LEET_TOKEN = re.compile(r"[A-Za-z0-9@$]{3,}")
+_LEET_TOKEN = re.compile(r"[a-z0-9@$]{3,}")
 _LEET_MAP = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"})
-_LEET_CHARS = frozenset("013457@$")
 
 
 @dataclass(frozen=True, slots=True)
 class DeobfuscatedView:
     """A de-obfuscated rendering of some text.
 
-    ``source[i]`` is the index in the input that produced ``text[i]``;
-    ``changed`` lists (sorted) the indices of ``text`` that differ from, or
-    were joined across removed characters of, the input.
+    ``source[i]`` is the index in the *original* text that produced ``text[i]``;
+    ``changed`` lists (sorted) the indices of ``text`` that were translated or
+    joined across removed characters.
     """
 
     technique: str
@@ -113,10 +118,21 @@ class DeobfuscatedView:
     changed: tuple[int, ...]
 
 
-def _keep_letters(
-    text: str, src: list[int], changed: list[int], pattern: re.Pattern[str]
+def _wide(src: Sequence[int], i: int) -> bool:
+    """True when position ``i`` stands for more than one source character,
+    i.e. the normalizer collapsed a whitespace run here."""
+    return i + 1 < len(src) and src[i + 1] - src[i] > 1
+
+
+def _join(
+    text: str,
+    src: list[int],
+    changed: list[int],
+    pattern: _Finder | re.Pattern[str],
+    keep_sep: Callable[[int], bool],
 ) -> tuple[str, list[int], list[int]]:
-    """Within each match keep only the letters, preserving their source index."""
+    """Within each match drop separators, keeping letters and their source
+    indices; ``keep_sep(i)`` keeps a separator that is really a word gap."""
     out: list[str] = []
     out_src: list[int] = []
     out_changed: list[int] = []
@@ -136,10 +152,15 @@ def _keep_letters(
         s, e = m.span()
         copy(pos, s)
         for i in range(s, e):
-            if text[i].isalpha():
-                out.append(text[i])
+            ch = text[i]
+            if ch.isalpha():
+                out.append(ch)
                 out_src.append(src[i])
                 out_changed.append(length)
+                length += 1
+            elif keep_sep(i):
+                out.append(" ")
+                out_src.append(src[i])
                 length += 1
         pos = e
     copy(pos, len(text))
@@ -167,27 +188,40 @@ def _unleet(text: str) -> tuple[str, list[int]]:
     return _LEET_TOKEN.sub(fix, text), changed
 
 
-def deobfuscate(text: str) -> Iterator[DeobfuscatedView]:
+def deobfuscate(text: str, source: Sequence[int] | None = None) -> Iterator[DeobfuscatedView]:
     """Yield one view per applicable technique family.
 
-    Spacing, hyphenation and leetspeak are combined into one view, because
-    attackers combine them. rot13 is a separate view: applying it on top of the
-    others would scramble them.
+    ``text`` should be normalized (lowercase, folded); ``source`` maps each of
+    its characters to the original text and defaults to the identity. Spacing,
+    hyphenation and leetspeak are combined into one view, because attackers
+    combine them. rot13 is a separate view: applying it on top of the others
+    would scramble them.
     """
     shape = b"." + text.encode("utf-8", "ignore").translate(_SHAPE) + b"."
     hyphen = any(marker in text for marker in _HYPHEN_MARKERS)
     spaced = _SPACED_SHAPE in shape
     leet = any(s in shape for s in _LEET_SHAPES)
+    rot13 = any(marker in text for marker in _ROT13_MARKERS)
+    if not (hyphen or spaced or leet or rot13):
+        return
+    base = list(source) if source is not None else list(range(len(text)))
 
     techniques: list[str] = []
-    view = text
-    src = list(range(len(text))) if (hyphen or spaced or leet) else []
+    view, src = text, base
     changed: list[int] = []
-    if hyphen and _HYPHEN_BREAK.search(view):
-        view, src, changed = _keep_letters(view, src, changed, _HYPHEN_BREAK)
-        techniques.append("hyphenation")
+    if hyphen:
+        # Join only across a real line break: a newline, or a collapsed
+        # whitespace run (CRLF after a hyphen normalizes to "- "). "well- known"
+        # with a single space is left alone.
+        breaks = _HyphenBreaks(src)
+        if next(breaks.finditer(view), None) is not None:
+            view, src, changed = _join(view, src, changed, breaks, lambda i: False)
+            techniques.append("hyphenation")
     if spaced and _SPACED_RUN.search(view):
-        view, src, changed = _keep_letters(view, src, changed, _SPACED_RUN)
+        cur_src = src
+        view, src, changed = _join(
+            view, src, changed, _SPACED_RUN, lambda i: view[i] == " " and _wide(cur_src, i)
+        )
         techniques.append("letter-spacing")
     if leet:
         unleeted, leet_changed = _unleet(view)
@@ -198,12 +232,30 @@ def deobfuscate(text: str) -> Iterator[DeobfuscatedView]:
     if techniques:
         yield DeobfuscatedView("+".join(techniques), view, tuple(src), tuple(sorted(changed)))
 
-    lowered = text.lower()
-    if not any(marker in lowered for marker in _ROT13_MARKERS):
-        return
-    rot_words = [i for m in _ROT13_WORDS.finditer(text) for i in range(m.start(), m.end())]
-    if rot_words:
-        yield DeobfuscatedView("rot13", codecs.encode(text, "rot13"), tuple(range(len(text))), tuple(rot_words))
+    if rot13:
+        rot_words = [i for m in _ROT13_WORDS.finditer(text) for i in range(m.start(), m.end())]
+        if rot_words:
+            yield DeobfuscatedView("rot13", codecs.encode(text, "rot13"), tuple(base), tuple(rot_words))
+
+
+class _HyphenBreaks:
+    """Pattern-like: yields only hyphen breaks that sit on a real line break,
+    so `_join` can stay generic."""
+
+    __slots__ = ("_src",)
+
+    def __init__(self, src: Sequence[int]) -> None:
+        self._src = src
+
+    def finditer(self, text: str) -> Iterator[re.Match[str]]:
+        for m in _HYPHEN_BREAK.finditer(text):
+            i = m.start() + 2
+            if text[i] == "\n" or _wide(self._src, i):
+                yield m
+
+
+class _Finder(Protocol):
+    def finditer(self, text: str) -> Iterator[re.Match[str]]: ...
 
 
 def _windows(changed: tuple[int, ...], length: int) -> list[tuple[int, int]]:
@@ -232,50 +284,67 @@ class ObfuscationDetector:
         self._ruleset = compile_rules(rules_for(layer=Layer.UNTRUSTED, categories=_CATEGORIES))
 
     def scan(self, nt: NormalizedText, layer: Layer, config: GuardrailConfig) -> list[Finding]:
-        if not config.enable_obfuscation_scan or not nt.original:
+        if not config.enable_obfuscation_scan or not nt.text:
             return []
-        budget = config.budget
-        source = nt.original
-        segments = [(0, source)]
-        if len(source) > budget.max_chars:
-            # Same head+tail sampling as the normalizer: payloads are often
-            # appended at the very end of a long document.
-            tail_start = len(source) - budget.tail_chars
-            segments = [
-                (0, source[: budget.max_chars - budget.tail_chars]),
-                (tail_start, source[tail_start:]),
-            ]
-
+        # The normalized text already applies the head+tail sampling budget
+        # for oversized inputs, so there is nothing to re-sample here. The
+        # dense source map is only built once a gate has opened.
+        views = deobfuscate(nt.text, _LazySourceMap(nt))
         findings: list[Finding] = []
         reported: set[str] = set()
-        for offset, segment in segments:
-            for view in deobfuscate(segment):
-                for lo, hi in _windows(view.changed, len(view.text)):
-                    inner = normalize(view.text[lo:hi], max_chars=budget.max_chars)
-                    for m in self._ruleset.scan(inner.text, limit=4):
-                        vs, ve = inner.span(m.start, m.end)
-                        vs, ve = lo + vs, lo + ve
-                        if m.rule.id in reported or not _overlaps(view.changed, vs, ve):
-                            continue
-                        start = offset + view.source[vs]
-                        end = offset + view.source[ve - 1] + 1
-                        findings.append(
-                            Finding(
-                                rule_id=m.rule.id,
-                                category=m.rule.category,
-                                severity=Severity.CRITICAL
-                                if m.rule.severity >= Severity.HIGH
-                                else Severity.HIGH,
-                                score=0.85,
-                                detector=self.name,
-                                start=start,
-                                end=end,
-                                excerpt=source[start:end][:200],
-                                description=f"{m.rule.description} (after undoing {view.technique})",
-                                decoded_from=view.technique,
-                            )
+        source = nt.original
+        for view in views:
+            for lo, hi in _windows(view.changed, len(view.text)):
+                inner = normalize(view.text[lo:hi], max_chars=len(view.text) + 1)
+                for m in self._ruleset.scan(inner.text, limit=4):
+                    vs, ve = inner.span(m.start, m.end)
+                    vs, ve = lo + vs, lo + ve
+                    if m.rule.id in reported or not _overlaps(view.changed, vs, ve):
+                        continue
+                    start = view.source[vs]
+                    end = view.source[ve - 1] + 1
+                    findings.append(
+                        Finding(
+                            rule_id=m.rule.id,
+                            category=m.rule.category,
+                            severity=Severity.CRITICAL
+                            if m.rule.severity >= Severity.HIGH
+                            else Severity.HIGH,
+                            score=0.85,
+                            detector=self.name,
+                            start=start,
+                            end=end,
+                            excerpt=source[start:end][:200],
+                            description=f"{m.rule.description} (after undoing {view.technique})",
+                            decoded_from=view.technique,
                         )
-                        reported.add(m.rule.id)
-                        if len(findings) >= _MAX_FINDINGS:
-                            return findings
+                    )
+                    reported.add(m.rule.id)
+                    if len(findings) >= _MAX_FINDINGS:
+                        return findings
         return findings
+
+
+class _LazySourceMap(Sequence[int]):
+    """Defers `NormalizedText.source_map()` until `deobfuscate` needs it, so
+    clean text that opens no gate never pays for a dense map."""
+
+    __slots__ = ("_nt", "_map")
+
+    def __init__(self, nt: NormalizedText) -> None:
+        self._nt = nt
+        self._map: list[int] | None = None
+
+    def _get(self) -> list[int]:
+        if self._map is None:
+            self._map = self._nt.source_map()
+        return self._map
+
+    def __len__(self) -> int:
+        return len(self._nt.text)
+
+    def __getitem__(self, i):  # type: ignore[no-untyped-def, override]
+        return self._get()[i]
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._get())
