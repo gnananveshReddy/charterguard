@@ -12,6 +12,9 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- `benchmarks/accuracy.py`: precision, recall, FPR and latency on the bundled
+  corpus and two public Hugging Face datasets (stdlib only, cached). Results
+  are in the README, unflattering numbers included.
 - `ObfuscationDetector`, on by default: detects injection hidden by
   leetspeak (`1gn0r3 4ll pr3v10us`), letter spacing (`i g n o r e`,
   `i.g.n.o.r.e`), words hyphenated across a line break, and rot13. All four
