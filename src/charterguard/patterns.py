@@ -445,6 +445,25 @@ _SECRETS: tuple[Rule, ...] = (
 )
 
 # --------------------------------------------------------------- pii
+def _iban_pattern() -> str:
+    """Exact-length IBAN shapes: for each registry length, the countries using
+    it, two check digits, then exactly the right number of 4-character groups
+    (each optionally preceded by one space) and the remainder."""
+    from .validators import _IBAN_LENGTHS
+
+    by_length: dict[int, list[str]] = {}
+    for country, length in sorted(_IBAN_LENGTHS.items()):
+        by_length.setdefault(length, []).append(country)
+    branches = []
+    for length, countries in sorted(by_length.items()):
+        groups, rest = divmod(length - 4, 4)
+        branch = rf"(?:{'|'.join(countries)})\d{{2}}(?: ?[a-z0-9]{{4}}){{{groups}}}"
+        if rest:
+            branch += rf" ?[a-z0-9]{{{rest}}}"
+        branches.append(branch)
+    return r"\b(?:" + "|".join(branches) + r")(?![a-z0-9])"
+
+
 _PII: tuple[Rule, ...] = (
     Rule("pii.email", Category.PII, Severity.LOW,
          r"\b[a-z0-9._%+\-]{1,64}@[a-z0-9.\-]{1,180}\.[a-z]{2,12}\b", "Email address"),
@@ -489,11 +508,12 @@ _PII: tuple[Rule, ...] = (
          r"passport\s*(?:no\.?|number|#)?[\s:.#\-]{0,4}[a-z][1-9]\d{5}[1-9]\b",
          "Passport number (IN)"),
     Rule("pii.iban", Category.PII, Severity.MEDIUM,
-         # Compact or printed in groups of four ("DE89 3704 0044 ..."). The
-         # validator checks country, length and mod-97: the bare shape also
-         # matches hex digests and git SHAs.
-         r"\b[a-z]{2}\d{2}(?: ?[a-z0-9]{4}){2,7}(?: ?[a-z0-9]{1,4})?\b", "IBAN",
-         validate="iban"),
+         # One exact-length branch per IBAN length, compact or printed in
+         # groups of four. A greedy "2-7 groups" shape would swallow a
+         # following word ("BE68 5390 0754 7034 bank"), fail the length check
+         # in the validator and leak the IBAN. The validator still checks
+         # country, length and mod-97 (the bare shape matches hex digests).
+         _iban_pattern(), "IBAN", validate="iban"),
     Rule("pii.mrn", Category.PII, Severity.MEDIUM,
          r"(?:mrn|patient\s+id|medical\s+record\s+(?:number|no))[\s:#]{1,4}[a-z0-9\-]{5,20}",
          "Medical record number"),
