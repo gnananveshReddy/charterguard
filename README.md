@@ -445,8 +445,9 @@ and does anything actually fire it? A rule that never fires is either dead
 * PII rules are tuned for false-positive cost, with checksum and entropy gates.
   They cover PII that has *structure*. Free-text PII needs the NER seam.
 * Multilingual coverage is seed-level: common override phrasings in about a dozen
-  languages, generated through the same normalizer the scanner uses. Paraphrase
-  in any language still needs a classifier.
+  languages, plus native-script override rules for ten Indian languages and
+  romanized Hinglish (verb + "instructions" + "previous/all", either order).
+  Paraphrase in any language still needs a classifier.
 * Confusable folding uses an explicit table for high-frequency scripts plus NFKD
   for the long tail. It is not the complete Unicode confusables set.
 * The session ledger is process-local unless you supply a `CounterStore`; N

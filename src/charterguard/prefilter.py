@@ -86,6 +86,14 @@ class _Cursor:
         return self.i >= len(self.s)
 
 
+class _Unsupported(Exception):
+    """A regex construct the literal parser cannot reason about soundly."""
+
+
+# Inline flag groups: "(?i)" (global) or "(?i:" / "(?-i:" (scoped).
+_INLINE_FLAGS = re.compile(r"\?[aiLmsux]*(?:-[imsx]+)?[:)]")
+
+
 def _quantifier(c: _Cursor) -> bool:
     """Consume a quantifier if present. Return True if the atom stays mandatory.
 
@@ -153,13 +161,34 @@ def _parse_concat(c: _Cursor) -> frozenset[str] | None:
             flush()
             c.i += 1
             capturing_group = True
-            if c.s.startswith("?:", c.i):
-                c.i += 2
-            elif c.s.startswith("?=", c.i) or c.s.startswith("?!", c.i):
-                c.i += 2
-                capturing_group = False  # lookaround: contributes nothing
-            elif c.s.startswith("?P<", c.i):
-                c.i = c.s.index(">", c.i) + 1
+            if c.peek() == "?":
+                # Every extension group is handled explicitly. Anything not
+                # recognised makes the pattern unconstrained: treating its
+                # syntax as literal text (as "(?<!" once was) is unsound.
+                if c.s.startswith("?:", c.i) or c.s.startswith("?>", c.i):
+                    c.i += 2
+                elif c.s.startswith(("?<=", "?<!"), c.i):
+                    c.i += 3
+                    capturing_group = False  # lookbehind: contributes nothing
+                elif c.s.startswith(("?=", "?!"), c.i):
+                    c.i += 2
+                    capturing_group = False  # lookahead: contributes nothing
+                elif c.s.startswith("?P<", c.i) or (
+                    c.s.startswith("?<", c.i) and c.s[c.i + 2 : c.i + 3] not in ("=", "!")
+                ):
+                    c.i = c.s.index(">", c.i) + 1
+                elif c.s.startswith("?#", c.i):
+                    c.i = c.s.index(")", c.i) + 1  # comment group
+                    continue
+                elif (flags := _INLINE_FLAGS.match(c.s, c.i)) is not None:
+                    c.i = flags.end()
+                    if c.s[c.i - 1] == ")":
+                        continue  # global flags such as (?i): no group body
+                    # Scoped flags change how the body matches (case, etc.);
+                    # keep parsing for structure but never use its literals.
+                    capturing_group = False
+                else:
+                    raise _Unsupported(c.s[c.i : c.i + 4])
             inner = _parse_alternation(c)
             if c.peek() == ")":
                 c.i += 1
@@ -217,7 +246,12 @@ def required_literals(pattern: str) -> frozenset[str] | None:
     Returns None when no such condition can be proven, in which case the caller
     must scan unconditionally.
     """
-    return _parse_alternation(_Cursor(pattern))
+    try:
+        return _parse_alternation(_Cursor(pattern))
+    except (_Unsupported, ValueError):
+        # ValueError: an unterminated "(?P<" or "(?#" -- also fail open to a
+        # full scan rather than guess.
+        return None
 
 
 def split_alternation(pattern: str) -> list[str]:
