@@ -141,6 +141,13 @@ class GuardrailConfig:
         return replace(self, modes={c: mode for c in Category})
 
     @classmethod
+    def from_file(cls, path: str) -> GuardrailConfig:
+        """Load a TOML/JSON policy file. See `charterguard.policy_file`."""
+        from .policy_file import load_policy  # local: policy_file imports this module
+
+        return load_policy(path)
+
+    @classmethod
     def report_only(cls) -> GuardrailConfig:
         """Phase 1 of rollout: observe precision before enforcing anything."""
         return cls().with_all_modes(Mode.REPORT)

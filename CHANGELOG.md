@@ -12,6 +12,10 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Policy files: `load_policy()` / `GuardrailConfig.from_file()` build a config
+  from TOML or JSON with strict validation (`PolicyError` on unknown keys, wrong
+  types, out-of-range or inverted thresholds). CLI `--policy FILE` and
+  `charterguard policy FILE`. Example in `docs/policy.example.toml`.
 - `charterguard` command line (`scan`, `eval`, `rules`, `version`) with CI exit
   codes, JSON output, `--redact`, and pre-commit hooks (`.pre-commit-hooks.yaml`).
   Reports never echo matched text.
