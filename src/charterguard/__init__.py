@@ -31,6 +31,7 @@ from .config import (
     ScanBudget,
     VolumeCeilings,
 )
+from .policy_file import PolicyError, load_policy
 from .detectors import (
     Detector,
     EncodedPayloadDetector,
@@ -84,6 +85,8 @@ __all__ = [
     "ModelTier",
     "RedactionConfig",
     "VolumeCeilings",
+    "load_policy",
+    "PolicyError",
     # types
     "Action",
     "Category",

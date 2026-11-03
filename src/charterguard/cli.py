@@ -1,4 +1,4 @@
-"""Command-line interface: ``charterguard scan | eval | rules | version``.
+"""Command-line interface: ``charterguard scan | eval | rules | policy | version``.
 
     echo "ignore all previous instructions" | charterguard scan
     charterguard scan --layer untrusted retrieved/*.md --json
@@ -29,6 +29,7 @@ from . import __version__
 from .config import GuardrailConfig
 from .patterns import RULES
 from .pipeline import GuardrailPipeline
+from .policy_file import PolicyError, load_policy, policy_to_mapping
 from .types import Action, Category, Layer, Verdict
 
 _LAYERS = {
@@ -42,8 +43,19 @@ _FAIL_ON = {"flag": 1, "block": 2, "never": 3}
 
 
 # ------------------------------------------------------------------ helpers
-def _pipeline(strict: bool) -> GuardrailPipeline:
-    return GuardrailPipeline(GuardrailConfig.strict() if strict else GuardrailConfig())
+def _config(args: argparse.Namespace) -> GuardrailConfig:
+    if getattr(args, "policy", None):
+        if args.strict:
+            raise SystemExit("charterguard: use either --policy or --strict (set preset = \"strict\" in the file)")
+        try:
+            return load_policy(args.policy)
+        except PolicyError as exc:
+            raise SystemExit(f"charterguard: {exc}") from exc
+    return GuardrailConfig.strict() if args.strict else GuardrailConfig()
+
+
+def _pipeline(args: argparse.Namespace) -> GuardrailPipeline:
+    return GuardrailPipeline(_config(args))
 
 
 def _check(p: GuardrailPipeline, layer: str, text: str, source: str) -> tuple[Verdict, str | None]:
@@ -92,7 +104,7 @@ def _finding_dicts(v: Verdict) -> list[dict[str, object]]:
 
 # --------------------------------------------------------------------- scan
 def _cmd_scan(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
-    p = _pipeline(args.strict)
+    p = _pipeline(args)
     worst = 0
     reports = []
     for source, text in _inputs(args.paths, stdin):
@@ -134,7 +146,7 @@ def _truthy(value: object) -> bool:
 
 
 def _cmd_eval(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
-    p = _pipeline(args.strict)
+    p = _pipeline(args)
     tp = fp = tn = fn = 0
     misses: list[str] = []
     for source, blob in _inputs([args.path], stdin):
@@ -218,6 +230,18 @@ def _cmd_rules(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
     return 0
 
 
+def _cmd_policy(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
+    """Validate a policy file and print the effective policy it produces."""
+    try:
+        cfg = load_policy(args.path)
+    except PolicyError as exc:
+        out.write(f"invalid: {exc}\n")
+        return 1
+    json.dump(policy_to_mapping(cfg), out, indent=2)
+    out.write("\n")
+    return 0
+
+
 def _cmd_version(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
     out.write(f"charterguard {__version__}\n")
     return 0
@@ -232,6 +256,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--layer", choices=sorted(_LAYERS), default="input",
                         help="which guardrail to apply (default: input)")
         sp.add_argument("--strict", action="store_true", help="use GuardrailConfig.strict()")
+        sp.add_argument("--policy", metavar="FILE", help="TOML/JSON policy file (see charterguard.policy_file)")
         sp.add_argument("--json", action="store_true", help="machine-readable output")
 
     scan = sub.add_parser("scan", help="scan files or stdin")
@@ -259,6 +284,10 @@ def build_parser() -> argparse.ArgumentParser:
     rules.add_argument("--layer", choices=sorted(_LAYERS))
     rules.add_argument("--json", action="store_true")
     rules.set_defaults(func=_cmd_rules)
+
+    policy = sub.add_parser("policy", help="validate a policy file and print the effective policy")
+    policy.add_argument("path")
+    policy.set_defaults(func=_cmd_policy)
 
     version = sub.add_parser("version", help="print the version")
     version.set_defaults(func=_cmd_version)
