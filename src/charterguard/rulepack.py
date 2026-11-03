@@ -118,10 +118,48 @@ class RulePack:
 
 
 # ------------------------------------------------------------ pattern safety
-def _width_view(pattern: str) -> str:
-    # The normalizer collapses every whitespace run to one character, so on
-    # scanned text `\s+` matches exactly one and `\s*` at most one.
-    return pattern.replace(r"\s+", r"\s").replace(r"\s*", r"\s?")
+_UNBOUNDED = 1 << 30
+
+
+def _is_whitespace_item(sub: Any) -> bool:
+    """``\\s`` or ``[\\s]`` or a literal space, alone.
+
+    The normalizer collapses every whitespace run to one character, so on
+    scanned text a repeat of exactly this item matches at most one character.
+    Decided on the PARSE TREE, never by rewriting the pattern source: a text
+    rewrite of ``\\s+`` also rewrites ``\\\\s+`` (a literal backslash, then an
+    unbounded ``s+``) and hides it from the checks.
+    """
+    if len(sub) != 1:
+        return False
+    op, av = sub[0]
+    if op == _sre.LITERAL:
+        return bool(av == 0x20)
+    return bool(op == _sre.IN and list(av) == [(_sre.CATEGORY, _sre.CATEGORY_SPACE)])
+
+
+def _max_width(items: Any) -> int:
+    """Longest text ``items`` can match on normalized input."""
+    total = 0
+    for op, av in items:
+        if op in _SIMPLE_OPS:
+            total += 1
+        elif op == _sre.SUBPATTERN:
+            total += _max_width(av[3])
+        elif op == _sre.BRANCH:
+            total += max(_max_width(b) for b in av[1])
+        elif op in _REPEATS:
+            low, high, sub = av
+            if _is_whitespace_item(sub):
+                total += 1 if high >= 1 else 0
+            else:
+                inner = _max_width(sub)
+                total += _UNBOUNDED if (high >= _sre.MAXREPEAT and inner) else high * inner
+        elif op == getattr(_sre, "ATOMIC_GROUP", object()):
+            total += _max_width(av)
+        # AT (anchors) and lookarounds consume nothing.
+        total = min(total, _UNBOUNDED)
+    return total
 
 
 def _walk(items: Any, where: str, *, in_repeat: bool) -> None:
@@ -135,6 +173,14 @@ def _walk(items: Any, where: str, *, in_repeat: bool) -> None:
             _walk(sub, where, in_repeat=in_repeat)
         elif op in _REPEATS:
             low, high, sub = av
+            if _is_whitespace_item(sub):
+                continue  # at most one character on normalized text: no backtracking
+            if high >= _sre.MAXREPEAT:
+                # Anywhere -- including inside a lookaround, which the overall
+                # width does not count: "x(?=a*a*a*b)" backtracks polynomially.
+                raise RulePackError(
+                    f"{where}: unbounded repeat; use a bounded one such as \\S{{1,40}} instead of * or +"
+                )
             if in_repeat and high > 1:
                 raise RulePackError(
                     f"{where}: nested quantifier; unroll the inner repeat "
@@ -149,6 +195,8 @@ def _walk(items: Any, where: str, *, in_repeat: bool) -> None:
                 _walk(sub, where, in_repeat=in_repeat)
         elif op in (_sre.ASSERT, _sre.ASSERT_NOT):
             _walk(av[1], where, in_repeat=in_repeat)
+            if _max_width(av[1]) > WINDOW:
+                raise RulePackError(f"{where}: a lookaround may span at most {WINDOW} characters")
         elif op == getattr(_sre, "ATOMIC_GROUP", object()):
             _walk(av, where, in_repeat=in_repeat)
         elif op in (_sre.GROUPREF, _sre.GROUPREF_EXISTS):
@@ -165,18 +213,19 @@ def check_pattern(pattern: str, where: str = "pattern") -> None:
         raise RulePackError(f"{where}: longer than {MAX_PATTERN_CHARS} characters")
     try:
         re.compile(pattern)
-        parsed = _sre.parse(_width_view(pattern))
+        parsed = _sre.parse(pattern)
     except re.error as exc:
         raise RulePackError(f"{where}: invalid regex ({exc})") from exc
     if parsed.state.flags & _FORBIDDEN_GLOBAL_FLAGS:
         raise RulePackError(f"{where}: inline flags are not allowed")
     _walk(parsed, where, in_repeat=False)
-    low, high = parsed.getwidth()
+    high = _max_width(parsed)
     if high > WINDOW:
         raise RulePackError(
-            f"{where}: can match up to {high if high < _sre.MAXREPEAT else 'unbounded'} characters; "
-            f"the limit is {WINDOW}. Use bounded repeats such as \\S{{1,40}} instead of * or +"
+            f"{where}: can match up to {high} characters; the limit is {WINDOW}. "
+            "Use bounded repeats such as \\S{1,40}"
         )
+    low = parsed.getwidth()[0]
     if low < MIN_WIDTH:
         raise RulePackError(f"{where}: can match fewer than {MIN_WIDTH} characters")
 
@@ -327,7 +376,10 @@ def bundled_rule_pack(name: str) -> RulePack:
         data = tomllib.loads(resource.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as exc:  # pragma: no cover - shipped packs are tested
         raise RulePackError(f"{name}: invalid TOML ({exc})") from exc
-    return rule_pack_from_mapping(data, source=f"charterguard:{name}")
+    pack = rule_pack_from_mapping(data, source=f"charterguard:{name}")
+    if pack.name != name:  # pragma: no cover - shipped packs are tested
+        raise RulePackError(f"bundled pack file {name}.toml declares name {pack.name!r}")
+    return pack
 
 
 def combine_rules(packs: Iterable[RulePack], *, builtin: Sequence[Rule] = RULES) -> tuple[Rule, ...]:

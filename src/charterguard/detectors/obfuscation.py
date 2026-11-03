@@ -53,7 +53,7 @@ from typing import Protocol
 
 from ..config import GuardrailConfig
 from ..normalize import NormalizedText, normalize
-from ..patterns import rules_for
+from ..patterns import RULES, Rule, rules_for
 from ..scanner import compile_rules
 from ..types import Category, Finding, Layer, Severity
 from .base import severity_score
@@ -356,8 +356,9 @@ class ObfuscationDetector:
 
     __slots__ = ("_ruleset",)
 
-    def __init__(self) -> None:
-        self._ruleset = compile_rules(rules_for(layer=Layer.UNTRUSTED, categories=_CATEGORIES))
+    def __init__(self, *, rules: Sequence[Rule] = RULES) -> None:
+        # ``rules``: the full rule set in force (built-in plus any rule packs).
+        self._ruleset = compile_rules(rules_for(layer=Layer.UNTRUSTED, categories=_CATEGORIES, rules=rules))
 
     def scan(self, nt: NormalizedText, layer: Layer, config: GuardrailConfig) -> list[Finding]:
         if not config.enable_obfuscation_scan or not nt.text:

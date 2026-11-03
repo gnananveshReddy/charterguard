@@ -58,10 +58,17 @@ def _config(args: argparse.Namespace) -> GuardrailConfig:
 
 
 def _load_pack(ref: str) -> RulePack:
-    """A pack file path, or the name of a pack bundled with charterguard."""
-    path = Path(ref)
-    if path.suffix == ".toml" or path.exists():
-        return load_rule_pack(path)
+    """A ``.toml`` file path, or the name of a pack bundled with charterguard.
+
+    The two namespaces never overlap: a bare name is always a bundled pack,
+    even if a file of that name sits in the working directory (otherwise a
+    planted ``agent-tools`` file in a repository would replace the reviewed
+    bundled pack in that repository's CI). Files must end in ``.toml``.
+    """
+    if ref.endswith(".toml"):
+        return load_rule_pack(Path(ref))
+    if "/" in ref or "\\" in ref or "." in ref:
+        raise RulePackError(f"{ref!r}: pack files must end in .toml; bare names are bundled packs")
     return bundled_rule_pack(ref)
 
 

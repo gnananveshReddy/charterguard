@@ -148,10 +148,12 @@ class GuardrailPipeline:
             )
         self._rules: tuple[Rule, ...] = combine_rules(rule_packs) if rule_packs else RULES
         self._detectors: tuple[Detector, ...] = tuple(detectors) if detectors is not None else (
-            RuleDetector(rules=self._rules) if rule_packs else RuleDetector(),
+            # Pack rules run everywhere built-in rules do: on the text, on
+            # decoded payloads and on de-obfuscated views.
+            RuleDetector(rules=self._rules),
             StructuralDetector(),
-            EncodedPayloadDetector(),
-            ObfuscationDetector(),
+            EncodedPayloadDetector(rules=self._rules),
+            ObfuscationDetector(rules=self._rules),
         )
         self._model = ModelDetector(model) if model is not None else None
         self._cache = ResultCache(self.config.budget.cache_size)

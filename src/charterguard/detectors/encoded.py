@@ -18,11 +18,12 @@ from __future__ import annotations
 import base64
 import binascii
 import re
+from collections.abc import Sequence
 from urllib.parse import unquote
 
 from ..config import GuardrailConfig, ScanBudget
 from ..normalize import NormalizedText, normalize
-from ..patterns import rules_for
+from ..patterns import RULES, Rule, rules_for
 from ..scanner import compile_rules
 from ..types import Category, Finding, Layer, Severity
 from ..validators import is_encoded_run
@@ -87,9 +88,11 @@ class EncodedPayloadDetector:
 
     __slots__ = ("_ruleset",)
 
-    def __init__(self) -> None:
+    def __init__(self, *, rules: Sequence[Rule] = RULES) -> None:
+        # ``rules``: the full rule set in force (built-in plus any rule packs),
+        # so a pack rule is not bypassed by base64-encoding its trigger.
         self._ruleset = compile_rules(
-            rules_for(layer=Layer.UNTRUSTED, categories=_DECODED_CATEGORIES)
+            rules_for(layer=Layer.UNTRUSTED, categories=_DECODED_CATEGORIES, rules=rules)
         )
 
     def scan(self, nt: NormalizedText, layer: Layer, config: GuardrailConfig) -> list[Finding]:
