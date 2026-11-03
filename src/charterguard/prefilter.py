@@ -40,6 +40,7 @@ with the prefilter enabled and disabled and asserts identical findings.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 # Literals shorter than this are too common to be selective ("do", "on", "is").
@@ -84,6 +85,14 @@ class _Cursor:
 
     def done(self) -> bool:
         return self.i >= len(self.s)
+
+
+class _Unsupported(Exception):
+    """A regex construct the literal parser cannot reason about soundly."""
+
+
+# Inline flag groups: "(?i)" (global) or "(?i:" / "(?-i:" (scoped).
+_INLINE_FLAGS = re.compile(r"\?[aiLmsux]*(?:-[imsx]+)?[:)]")
 
 
 def _quantifier(c: _Cursor) -> bool:
@@ -153,13 +162,34 @@ def _parse_concat(c: _Cursor) -> frozenset[str] | None:
             flush()
             c.i += 1
             capturing_group = True
-            if c.s.startswith("?:", c.i):
-                c.i += 2
-            elif c.s.startswith("?=", c.i) or c.s.startswith("?!", c.i):
-                c.i += 2
-                capturing_group = False  # lookaround: contributes nothing
-            elif c.s.startswith("?P<", c.i):
-                c.i = c.s.index(">", c.i) + 1
+            if c.peek() == "?":
+                # Every extension group is handled explicitly. Anything not
+                # recognised makes the pattern unconstrained: treating its
+                # syntax as literal text (as "(?<!" once was) is unsound.
+                if c.s.startswith("?:", c.i) or c.s.startswith("?>", c.i):
+                    c.i += 2
+                elif c.s.startswith(("?<=", "?<!"), c.i):
+                    c.i += 3
+                    capturing_group = False  # lookbehind: contributes nothing
+                elif c.s.startswith(("?=", "?!"), c.i):
+                    c.i += 2
+                    capturing_group = False  # lookahead: contributes nothing
+                elif c.s.startswith("?P<", c.i) or (
+                    c.s.startswith("?<", c.i) and c.s[c.i + 2 : c.i + 3] not in ("=", "!")
+                ):
+                    c.i = c.s.index(">", c.i) + 1
+                elif c.s.startswith("?#", c.i):
+                    c.i = c.s.index(")", c.i) + 1  # comment group
+                    continue
+                elif (flags := _INLINE_FLAGS.match(c.s, c.i)) is not None:
+                    c.i = flags.end()
+                    if c.s[c.i - 1] == ")":
+                        continue  # global flags such as (?i): no group body
+                    # Scoped flags change how the body matches (case, etc.);
+                    # keep parsing for structure but never use its literals.
+                    capturing_group = False
+                else:
+                    raise _Unsupported(c.s[c.i : c.i + 4])
             inner = _parse_alternation(c)
             if c.peek() == ")":
                 c.i += 1
@@ -217,7 +247,12 @@ def required_literals(pattern: str) -> frozenset[str] | None:
     Returns None when no such condition can be proven, in which case the caller
     must scan unconditionally.
     """
-    return _parse_alternation(_Cursor(pattern))
+    try:
+        return _parse_alternation(_Cursor(pattern))
+    except (_Unsupported, ValueError):
+        # ValueError: an unterminated "(?P<" or "(?#" -- also fail open to a
+        # full scan rather than guess.
+        return None
 
 
 def split_alternation(pattern: str) -> list[str]:
@@ -406,6 +441,16 @@ class LiteralIndex:
         )
 
 
+def _is_word_char(ch: str) -> bool:
+    """Alphanumerics, underscore, and combining marks.
+
+    Indic vowel signs and viramas are category M, not alphanumeric; without
+    them a window edge could split "निर्देश" between a consonant and its
+    vowel sign.
+    """
+    return ch.isalnum() or ch == "_" or unicodedata.category(ch).startswith("M")
+
+
 def windows(text: str, offsets: tuple[int, ...]) -> list[tuple[int, int]]:
     """Merged, word-boundary-safe scan windows around trigger offsets.
 
@@ -418,9 +463,9 @@ def windows(text: str, offsets: tuple[int, ...]) -> list[tuple[int, int]]:
     for off in offsets:
         lo = max(0, off - WINDOW)
         hi = min(n, off + WINDOW)
-        while lo > 0 and (text[lo - 1].isalnum() or text[lo - 1] == "_"):
+        while lo > 0 and _is_word_char(text[lo - 1]):
             lo -= 1
-        while hi < n and (text[hi].isalnum() or text[hi] == "_"):
+        while hi < n and _is_word_char(text[hi]):
             hi += 1
         if spans and lo <= spans[-1][1]:
             prev_lo, prev_hi = spans[-1]

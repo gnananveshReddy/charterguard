@@ -206,6 +206,13 @@ GuardrailConfig().with_mode(Category.INJECTION, Mode.BLOCK)     # one category
 Defaults are deliberate: secrets and exfiltration block, PII is redacted rather
 than blocked, and restricted topics only report.
 
+**Talking about attacks is not an attack.** On the user's own turn, an
+injection phrase quoted in order to discuss it ("Explain 'ignore previous
+instructions' attacks") is lowered to MEDIUM, so it flags rather than blocks,
+and the bare word "jailbreak" is recorded but never blocks. Retrieved content
+and tool output are never dampened -- there, the attacker controls the quotes.
+Set `dampen_quoted_mentions=False` to turn this off.
+
 ## Audit
 
 `verdict.to_audit()` returns a JSON-safe payload. The audit integration turns
@@ -438,8 +445,9 @@ and does anything actually fire it? A rule that never fires is either dead
 * PII rules are tuned for false-positive cost, with checksum and entropy gates.
   They cover PII that has *structure*. Free-text PII needs the NER seam.
 * Multilingual coverage is seed-level: common override phrasings in about a dozen
-  languages, generated through the same normalizer the scanner uses. Paraphrase
-  in any language still needs a classifier.
+  languages, plus native-script override rules for ten Indian languages and
+  romanized Hinglish (verb + "instructions" + "previous/all", either order).
+  Paraphrase in any language still needs a classifier.
 * Confusable folding uses an explicit table for high-frequency scripts plus NFKD
   for the long tail. It is not the complete Unicode confusables set.
 * The session ledger is process-local unless you supply a `CounterStore`; N

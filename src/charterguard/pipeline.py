@@ -30,7 +30,7 @@ the thread handoff would cost more than the scan.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, TypeVar
 from collections.abc import Callable, Sequence
 
@@ -43,23 +43,35 @@ from .detectors import (
     ObfuscationDetector,
     RuleDetector,
     StructuralDetector,
+    severity_score,
 )
 from .envelope import EnvelopeFactory, SystemPrefixGuard
 from .exceptions import GuardrailBlocked
 from .grounding import GroundingChecker
 from .ledger import SessionLedger
+from .mentions import (
+    MAX_QUOTE_CHARS,
+    MIN_PHRASE_COVERAGE,
+    frame_is_a_question,
+    keep_only_spans,
+    mask_spans,
+    quoted_spans,
+)
 from .observability import MetricsSink, NullMetrics, emit as emit_metrics
-from .normalize import normalize
+from .normalize import NormalizedText, normalize
 from .policy import decide, dedupe
 from .redact import RedactionResult, redact
 from .refusals import refusal_for
-from .scanner import ResultCache, content_key
+from .patterns import rules_for
+from .scanner import CompiledRuleSet, ResultCache, compile_rules, content_key
 from .scope import Charter, IntentClassifier, ScopeGate
 from .types import Action, Category, Finding, Layer, Severity, Timer, Verdict
 
 _T = TypeVar("_T")
 
 _DEFAULT_SESSION = "default"
+# Only instruction-shaped findings can be "mentioned"; a quoted secret is still a secret.
+_DAMPENABLE = frozenset({Category.INJECTION, Category.JAILBREAK})
 
 # Categories redaction can neutralise in place. Everything else -- injection,
 # exfiltration, destructive commands -- must quarantine instead.
@@ -98,6 +110,7 @@ class GuardrailPipeline:
         "_cache",
         "_metrics",
         "_audit",
+        "_all_input_rules",
     )
 
     def __init__(
@@ -136,6 +149,8 @@ class GuardrailPipeline:
         # .write(verdict). None means decisions are not persisted, which is a
         # deliberate choice the caller makes rather than a silent default.
         self._audit: Any = audit_sink
+        # Built on first use by quoted-mention dampening; most pipelines never need it.
+        self._all_input_rules: CompiledRuleSet | None = None
 
     # ------------------------------------------------------------------ core
     def _scan(self, text: str, layer: Layer) -> tuple[tuple[Finding, ...], bool]:
@@ -148,6 +163,15 @@ class GuardrailPipeline:
             return cached  # type: ignore[return-value]
 
         nt = normalize(text, max_chars=cfg.budget.max_chars, tail_chars=cfg.budget.tail_chars)
+        findings = self._run_detectors(nt, layer)
+        if layer is Layer.INPUT and cfg.dampen_quoted_mentions:
+            findings = self._dampen_quoted_mentions(text, findings, layer)
+        result = (dedupe(findings), nt.truncated)
+        self._cache.put(key, result)
+        return result
+
+    def _run_detectors(self, nt: NormalizedText, layer: Layer) -> list[Finding]:
+        cfg = self.config
         findings: list[Finding] = []
         for detector in self._detectors:
             findings.extend(detector.scan(nt, layer, cfg))
@@ -155,9 +179,88 @@ class GuardrailPipeline:
                 f.severity is Severity.CRITICAL for f in findings
             ):
                 break
-        result = (dedupe(findings), nt.truncated)
-        self._cache.put(key, result)
-        return result
+        return findings
+
+    def _dampen_quoted_mentions(
+        self, text: str, findings: list[Finding], layer: Layer
+    ) -> list[Finding]:
+        """Lower an injection/jailbreak phrase that is quoted for discussion.
+
+        Every condition in `mentions.py` must hold, or `findings` is returned
+        unchanged. Any doubt keeps the original verdict: this path can only
+        ever make a decision softer, so it must fail closed.
+        """
+        spans = quoted_spans(text)
+        if not spans or not findings:
+            return findings
+        holders = {
+            span for f in findings if f.category in _DAMPENABLE
+            for span in spans if span[0] <= f.start and f.end <= span[1]
+        }
+        if len(holders) != 1:
+            return findings
+        ((s, e),) = holders
+        for f in findings:
+            overlaps = f.start < e and f.end > s
+            contained = s <= f.start and f.end <= e
+            # A finding straddling the quote boundary, or a non-dampenable
+            # finding touching the quote, means the quote is not a clean mention.
+            if overlaps and (not contained or f.category not in _DAMPENABLE):
+                return findings
+        inner_len = (e - s) - 2  # quote characters excluded
+        if not 0 < inner_len <= MAX_QUOTE_CHARS:
+            return findings
+        # Allowlist, not denylist: everything outside the quote must be one of
+        # a few fixed question shapes. Any other clause keeps the verdict.
+        if not frame_is_a_question(text, (s, e)):
+            return findings
+
+        # Thorough scan of the quote alone with every detector this pipeline
+        # runs (including custom RuleDetectors) plus the full default rule set,
+        # never short-circuiting, so a second technique cannot go uncounted.
+        budget = self.config.budget
+        nt_quote = normalize(keep_only_spans(text, [(s, e)]), max_chars=budget.max_chars)
+        if self._all_input_rules is None:
+            self._all_input_rules = compile_rules(rules_for(layer=Layer.INPUT))
+        matches = self._all_input_rules.scan(nt_quote.text, limit=64)
+        detected = [f for d in self._detectors for f in d.scan(nt_quote, layer, self.config)]
+        if any(m.rule.category not in _DAMPENABLE for m in matches) or any(
+            f.category not in _DAMPENABLE for f in detected
+        ):
+            return findings
+        if len({m.rule.id for m in matches} | {f.rule_id for f in detected}) != 1:
+            return findings
+        covered: set[int] = set()
+        for m in matches:
+            lo, hi = nt_quote.span(m.start, m.end)
+            covered.update(range(lo, hi))
+        if len(covered) < MIN_PHRASE_COVERAGE * inner_len:
+            return findings
+
+        # Eligible. The text outside the quote is re-scanned from scratch: the
+        # rule detector stops at its first CRITICAL, so the original findings
+        # could be hiding something placed after the quoted phrase. Original
+        # findings outside the quote are kept as well -- nothing is dropped.
+        outside = self._run_detectors(
+            normalize(mask_spans(text, [(s, e)]), max_chars=budget.max_chars, tail_chars=budget.tail_chars),
+            layer,
+        )
+        medium = Severity.MEDIUM
+        softened: list[Finding] = []
+        kept: list[Finding] = []
+        for f in findings:
+            if s <= f.start and f.end <= e and f.category in _DAMPENABLE:
+                softened.append(
+                    replace(
+                        f,
+                        severity=min(f.severity, medium),
+                        score=min(f.score, severity_score(medium)),
+                        description=f"{f.description} (quoted in a question about it)",
+                    )
+                )
+            else:
+                kept.append(f)
+        return outside + kept + softened
 
     def _verdict(
         self,
