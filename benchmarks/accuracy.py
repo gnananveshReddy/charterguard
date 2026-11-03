@@ -3,6 +3,8 @@
     python benchmarks/accuracy.py                 # all datasets, markdown table
     python benchmarks/accuracy.py --json out.json # machine-readable too
     python benchmarks/accuracy.py --offline       # cached data only
+    python benchmarks/accuracy.py --model protectai-deberta-v3-injection-v2
+                                                  # + the pinned ONNX classifier tier
 
 Datasets are fetched once through the Hugging Face datasets-server JSON API
 (stdlib only, no `datasets`/`pyarrow`) and cached under
@@ -15,6 +17,12 @@ What is measured: `GuardrailPipeline.check_input` with the rule tiers only
 when it is a block. Numbers are reported per dataset with no tuning on them;
 the rules were never fitted to these sets.
 
+With ``--model PRESET`` (needs ``.[onnx]``), each preset also runs with that
+ONNX classifier as the model tier, escalated on every input
+(``escalate_clean``), through ``acheck_input``. A public classifier may have
+been trained on some of these datasets; check its model card before reading
+its numbers as held-out.
+
 Read the results with the datasets' labelling in mind -- see the notes printed
 with each table. Several label benign role-play ("act as an interviewer") as
 injection, and much of deepset/prompt-injections is German, which the rule
@@ -23,6 +31,7 @@ tier only partly covers. Those misses are what the classifier tier is for.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import statistics
 import sys
@@ -37,7 +46,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent / "src"))
 
 from charterguard import GuardrailConfig, GuardrailPipeline  # noqa: E402
-from charterguard.types import Action  # noqa: E402
+from charterguard.types import Action, Layer  # noqa: E402
 
 CACHE = ROOT / ".cache"
 API = "https://datasets-server.huggingface.co/rows"
@@ -133,13 +142,23 @@ class Score:
         return self.fp / (self.fp + self.tn) if self.fp + self.tn else 0.0
 
 
-def evaluate(samples: Iterable[tuple[str, bool]], pipeline: GuardrailPipeline) -> dict[str, object]:
+def with_input_model(cfg: GuardrailConfig) -> GuardrailConfig:
+    """``cfg`` with the model tier consulted on every input turn."""
+    from dataclasses import replace
+
+    tier = replace(cfg.model_for(Layer.INPUT), enabled=True, escalate_clean=True, clean_sample_rate=1.0)
+    return cfg.with_model_tier(Layer.INPUT, tier)
+
+
+def evaluate(
+    samples: Iterable[tuple[str, bool]], pipeline: GuardrailPipeline, *, use_async: bool = False
+) -> dict[str, object]:
     flagged, blocked = Score(), Score()
     latencies: list[float] = []
     n = 0
     for text, attack in samples:
         start = time.perf_counter()
-        verdict = pipeline.check_input(text)
+        verdict = asyncio.run(pipeline.acheck_input(text)) if use_async else pipeline.check_input(text)
         latencies.append((time.perf_counter() - start) * 1e6)
         flagged.add(attack, verdict.action is not Action.ALLOW)
         blocked.add(attack, verdict.blocked)
@@ -179,9 +198,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", type=Path, help="also write results as JSON")
     ap.add_argument("--offline", action="store_true", help="use cached datasets only")
     ap.add_argument("--local-only", action="store_true", help="only the bundled corpus")
+    ap.add_argument("--model", help="also run with this ONNX preset as the model tier (needs .[onnx])")
+    ap.add_argument("--model-cache", type=Path, help="cache directory for the model files")
     args = ap.parse_args(argv)
 
-    presets = {"default": GuardrailConfig(), "strict": GuardrailConfig.strict()}
+    presets: dict[str, tuple[GuardrailConfig, object]] = {
+        "default": (GuardrailConfig(), None),
+        "strict": (GuardrailConfig.strict(), None),
+    }
+    if args.model:
+        from charterguard.integrations.onnx_presets import injection_scorer
+
+        scorer = injection_scorer(preset=args.model, cache_dir=args.model_cache)
+        presets["default + model"] = (with_input_model(GuardrailConfig()), scorer)
+        presets["strict + model"] = (with_input_model(GuardrailConfig.strict()), scorer)
     sets: list[tuple[str, str, list[tuple[str, bool]]]] = [
         ("bundled corpus", "Hand-written attacks and deliberately tricky benign texts.", _local_corpus())
     ]
@@ -196,15 +226,17 @@ def main(argv: list[str] | None = None) -> int:
     print("|---|---|---|---|---|---|---|---|---|---|")
     for name, _note, samples in sets:
         results[name] = {}
-        for preset, cfg in presets.items():
-            r = evaluate(samples, GuardrailPipeline(cfg))
+        for preset, (cfg, scorer) in presets.items():
+            pipeline = GuardrailPipeline(cfg, model=scorer)  # type: ignore[arg-type]
+            r = evaluate(samples, pipeline, use_async=scorer is not None)
             results[name][preset] = r
             f, b = r["flag_or_block"], r["block"]
             assert isinstance(f, dict) and isinstance(b, dict)
             print(
                 f"| {name} | {preset} | {r['samples']} ({r['attacks']}) | {f['precision']:.2f} | "
                 f"{f['recall']:.2f} | {f['f1']:.2f} | {f['fpr']:.2f} | {b['recall']:.2f} | "
-                f"{b['fpr']:.2f} | {r['latency_us_p50']} |"
+                f"{b['fpr']:.2f} | {r['latency_us_p50']} |",
+                flush=True,
             )
     print()
     for name, note, _ in sets:

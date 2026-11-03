@@ -12,6 +12,14 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Pinned ONNX preset: `onnx_presets.injection_scorer()` loads
+  protectai/deberta-v3-base-prompt-injection-v2 by commit SHA with verified
+  SHA-256 digests. `benchmarks/accuracy.py --model PRESET` measures the full
+  cascade with it.
+- `label_map` values may be `None` to ignore an output (e.g. a `SAFE` class)
+  instead of mapping it to an unrelated category.
+- `CHARTERGUARD_MODEL_CACHE` sets the model cache directory (the old
+  `AGENT_GUARDRAILS_MODEL_CACHE` is still honoured).
 - Pydantic AI integration: `guard_capability(pipeline)` checks the prompt, tool
   calls, tool results and final output of an agent run (`[pydantic-ai]` extra).
 - Documentation site (`mkdocs.yml`, mkdocs-material, built `--strict` in CI and
