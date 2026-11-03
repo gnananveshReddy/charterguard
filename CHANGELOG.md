@@ -11,6 +11,29 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 
 ## [Unreleased]
 
+### Added
+- `ObfuscationDetector`, on by default: detects injection hidden by
+  leetspeak (`1gn0r3 4ll pr3v10us`), letter spacing (`i g n o r e`,
+  `i.g.n.o.r.e`), hyphenated line breaks (`prev-
+ious`) and rot13. All four
+  bypassed every rule before. Concealment raises severity, as for encoded
+  payloads. Disable with `GuardrailConfig(enable_obfuscation_scan=False)`.
+- Corpus: four new attack families and benign texts that deliberately open
+  the obfuscation gates (`3rd`, `w3c`, `U.S.A.`, hyphenated prose).
+
+### Security
+- HTTP adapters (`HttpModelScorer`, `OpenAIModerationScorer`,
+  `HttpIntentClassifier`, `HttpEntityRecognizer`) now accept only `https`, or
+  `http` with `allow_insecure_http=True`. Previously the opt-in admitted any
+  scheme, including `file://`, which `urlopen` reads from local disk.
+- HTTP adapters no longer follow redirects. urllib re-sends `Authorization`
+  and API-key headers to the redirect target, so a 3xx could forward the
+  credential (and prompt content) to an unconfigured host or to plaintext.
+  A redirect now raises `HttpError` with the 3xx status.
+- ONNX model downloads follow redirects only to `https` URLs.
+- `SqliteCounterStore` asserts at import that interpolated column names are
+  plain identifiers; all values were and remain bound parameters.
+
 ## [0.1.0]
 
 First public release under the name **charterguard**.

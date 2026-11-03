@@ -360,9 +360,17 @@ def test_gazetteer_capitalisation_heuristic_is_opt_in():
 # ---------------------------------------------------------------- http adapter
 class _Handler(BaseHTTPRequestHandler):
     fail_times = 0
+    redirected_hits: list = []
 
     def do_POST(self):  # noqa: N802
         body = json.loads(self.rfile.read(int(self.headers["content-length"])))
+        if self.path == "/redirect":
+            self.send_response(302)
+            self.send_header("location", "/elsewhere")
+            self.end_headers()
+            return
+        if self.path == "/elsewhere":
+            _Handler.redirected_hits.append(dict(self.headers))
         if _Handler.fail_times > 0:
             _Handler.fail_times -= 1
             self.send_response(503)
@@ -455,6 +463,63 @@ def test_http_adapters_never_send_credentials_over_cleartext():
             headers={"Authorization": "Bearer sk-secret"},
             allow_insecure_http=True,
         )
+
+
+def test_http_adapters_refuse_non_http_schemes_even_with_insecure_opt_in():
+    """allow_insecure_http opts into http, not into file:// or ftp://.
+
+    urlopen reads local files for file:, so a prefix check that only asked
+    "is it https?" let any other scheme through once the opt-in was set."""
+    from charterguard.integrations.http_adapters import HttpModelScorer
+
+    for url in ("file:///etc/passwd", "ftp://example.com/x", "gopher://x/", "https:///no-host"):
+        with pytest.raises(ValueError):
+            HttpModelScorer(url, parse=_parse, allow_insecure_http=True)
+    HttpModelScorer("HTTPS://moderation.example.com/score", parse=_parse)  # scheme is case-insensitive
+
+
+def test_http_adapters_refuse_redirects_so_credentials_are_not_forwarded():
+    """urllib follows 302 and re-sends Authorization to the new location; the
+    adapter must fail instead, so a key never reaches a host nobody configured."""
+    from charterguard.integrations.http_adapters import HttpError, HttpModelScorer
+
+    server, url = _serve()
+    _Handler.redirected_hits = []
+    try:
+        scorer = HttpModelScorer(
+            url.replace("/score", "/redirect"), parse=_parse, max_retries=0, allow_insecure_http=True
+        )
+        try:
+            asyncio.run(scorer.score("x", [Category.INJECTION], Layer.INPUT))
+        except HttpError as exc:
+            assert exc.status == 302
+        else:
+            raise AssertionError("redirect was followed")
+        assert _Handler.redirected_hits == []
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_model_download_redirects_may_not_leave_https():
+    from urllib.request import Request
+
+    from charterguard.integrations.onnx_model import _HttpsOnlyRedirect
+
+    handler = _HttpsOnlyRedirect()
+    req = Request("https://huggingface.co/org/m/resolve/x/model.onnx")
+    with pytest.raises(ModelIntegrityError):
+        handler.redirect_request(req, None, 302, "Found", {}, "http://cdn.example.com/model.onnx")
+    with pytest.raises(ModelIntegrityError):
+        handler.redirect_request(req, None, 302, "Found", {}, "file:///etc/passwd")
+    ok = handler.redirect_request(req, None, 302, "Found", {}, "https://cdn.example.com/model.onnx")
+    assert ok is not None and ok.full_url.startswith("https://")
+
+
+def test_sqlite_ledger_fields_are_sql_identifiers():
+    """Column names are interpolated into SQL; the import-time guard is what
+    keeps that safe, so pin the invariant it relies on."""
+    assert all(f.isidentifier() and f.isascii() for f in _FIELDS)
 
 
 # ------------------------------------------------------------- model integrity

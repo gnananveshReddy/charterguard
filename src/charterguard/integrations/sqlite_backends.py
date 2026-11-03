@@ -41,6 +41,11 @@ from .audit import GENESIS_HASH, event_payload, guardrail_rows
 
 __all__ = ["SqliteCounterStore", "SqliteAuditSink"]
 
+# Column names are interpolated into SQL (sqlite cannot bind identifiers), so
+# they must come only from this module-level constant and be plain identifiers.
+# Values are always bound with "?".
+if not all(f.isidentifier() and f.isascii() for f in _FIELDS):  # pragma: no cover
+    raise RuntimeError(f"ledger field names must be SQL-safe identifiers: {_FIELDS!r}")
 _COLS = ", ".join(_FIELDS)
 
 
@@ -108,13 +113,13 @@ class SqliteCounterStore:
         conn.execute("BEGIN IMMEDIATE")
         try:
             conn.execute(
-                f"INSERT INTO counters (session_id, {_COLS}, started, last_seen) "
+                f"INSERT INTO counters (session_id, {_COLS}, started, last_seen) "  # noqa: S608 - identifiers validated at import
                 f"VALUES (?, {placeholders}, ?, ?) "
                 f"ON CONFLICT(session_id) DO UPDATE SET {updates}, last_seen = excluded.last_seen",
                 (session_id, *(applied[f] for f in _FIELDS), now, now),
             )
             row = conn.execute(
-                f"SELECT {_COLS} FROM counters WHERE session_id = ?", (session_id,)
+                f"SELECT {_COLS} FROM counters WHERE session_id = ?", (session_id,)  # noqa: S608
             ).fetchone()
             conn.execute("COMMIT")
         except BaseException:
@@ -125,7 +130,7 @@ class SqliteCounterStore:
 
     def get(self, session_id: str) -> Mapping[str, int]:
         row = self._conn().execute(
-            f"SELECT {_COLS} FROM counters WHERE session_id = ?", (session_id,)
+            f"SELECT {_COLS} FROM counters WHERE session_id = ?", (session_id,)  # noqa: S608
         ).fetchone()
         return dict(zip(_FIELDS, row, strict=True)) if row else {f: 0 for f in _FIELDS}
 

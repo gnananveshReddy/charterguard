@@ -110,6 +110,8 @@ class GuardrailConfig:
     redaction: RedactionConfig = RedactionConfig()
     volume: VolumeCeilings = VolumeCeilings()
     enable_encoded_scan: bool = True
+    # Leetspeak, letter spacing, hyphenated line breaks, rot13. See detectors/obfuscation.py.
+    enable_obfuscation_scan: bool = True
     short_circuit_on_critical: bool = True
     policy_version: str = POLICY_VERSION
 

@@ -165,14 +165,16 @@ who can write the file can rewrite history. The hash chain makes edits
 **Third-party egress.** `HttpModelScorer`, `HttpIntentClassifier` and
 `HttpEntityRecognizer` send prompt or document content to whatever endpoint you
 configure -- often exactly the PII the guardrail exists to protect. `https` is
-required unless `allow_insecure_http=True` is passed explicitly, and credential
-headers are never sent over plaintext. Where data residency is constrained, use
+required unless `allow_insecure_http=True` is passed explicitly (which admits
+`http` and nothing else), credential headers are never sent over plaintext, and
+redirects are refused rather than followed, so a credential is only ever sent
+to the URL you configured. Where data residency is constrained, use
 the in-process spaCy/Presidio or ONNX adapters instead.
 
 ## Reproducible verification
 
 ```bash
-python tests/run_tests.py                    # 166 tests, no dependencies
+python tests/run_tests.py                    # full suite, no dependencies
 python tools/rule_coverage.py --json         # which rules the corpus exercises
 python benchmarks/bench.py                   # latency and throughput
 GUARDRAILS_ATTACK_CORPUS=/path/to.jsonl python tests/run_tests.py

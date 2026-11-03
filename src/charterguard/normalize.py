@@ -157,6 +157,23 @@ class NormalizedText:
         delta = index - self._norm_pos[i]
         return min(self._src_pos[i] + delta, max(len(self.original) - 1, 0))
 
+    def source_map(self) -> list[int]:
+        """`source_index` for every normalized position, built in bulk.
+
+        Equivalent to ``[self.source_index(i) for i in range(len(self))]`` but
+        expands the sparse breakpoints with ``range`` instead of a bisect per
+        character, for detectors that need a dense map.
+        """
+        n = len(self.text)
+        last = max(len(self.original) - 1, 0)
+        if not self._norm_pos:
+            return [min(i, last) for i in range(n)]
+        out: list[int] = [0] * self._norm_pos[0]
+        bounds = (*self._norm_pos, n)
+        for k, src in enumerate(self._src_pos):
+            out.extend(range(src, src + bounds[k + 1] - bounds[k]))
+        return [min(i, last) for i in out] if out and out[-1] > last else out
+
     def span(self, start: int, end: int) -> tuple[int, int]:
         """Map a normalized span back to an original span."""
         if not self.original:

@@ -270,8 +270,9 @@ pytest                        # same tests, if pytest is installed
 python benchmarks/bench.py
 ```
 
-269 tests cover normalization and offset mapping, injection and jailbreak
-detection, encoded payloads, secret and PII precision (Luhn, Verhoeff, entropy
+The test suite covers normalization and offset mapping, injection and jailbreak
+detection, encoded payloads, obfuscation (leetspeak, letter spacing,
+hyphenation, rot13), secret and PII precision (Luhn, Verhoeff, entropy
 gates), rule shadowing, scope enforcement, grounding, volume ceilings, prefilter
 equivalence, model-tier escalation bands and sampling, the multilingual pack, the
 NER seam, streaming enforcement, audit-chain integrity, metrics, the LangChain and
@@ -403,6 +404,12 @@ and does anything actually fire it? A rule that never fires is either dead
   execute code on load, and an explicit `label_map` because no code can infer
   that `LABEL_1` means `Category.INJECTION`. No torch, no transformers, no
   bundled weights.
+* **Obfuscation.** `ObfuscationDetector` (on by default,
+  `enable_obfuscation_scan=False` to disable) re-scans a de-obfuscated view of
+  the text, only around the characters it changed, and reports a match only
+  when it overlaps a change -- so a plain attack is never double-counted.
+  Gates run on a `bytes.translate` shape of the text: ~20 us per 4 KB when
+  nothing is obfuscated, about 8% of the rule scan.
 * **Streaming.** `StreamGuard(pipeline, holdback_chars=256)` enforces on a token
   stream: text is released only after it has been scanned, so a secret spanning
   two chunks is still redacted and a BLOCK terminates the stream.
@@ -424,6 +431,10 @@ and does anything actually fire it? A rule that never fires is either dead
   scanned. The verdict reports `truncated=True` and a `struct.oversized` finding.
 * Encoded-payload scanning decodes to `budget.decode_depth`. Deeper nesting is
   reported as suspicious rather than decoded.
+* Obfuscation scanning undoes leetspeak, letter spacing (`i g n o r e`,
+  `i.g.n.o.r.e`), hyphenated line breaks and rot13 before re-running the
+  injection rules. Letter spacing needs some other separator between words;
+  uniformly single-spaced letters cannot be segmented without a dictionary.
 * PII rules are tuned for false-positive cost, with checksum and entropy gates.
   They cover PII that has *structure*. Free-text PII needs the NER seam.
 * Multilingual coverage is seed-level: common override phrasings in about a dozen

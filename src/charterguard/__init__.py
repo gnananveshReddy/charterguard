@@ -36,6 +36,7 @@ from .detectors import (
     EncodedPayloadDetector,
     ModelDetector,
     ModelScorer,
+    ObfuscationDetector,
     RuleDetector,
     StructuralDetector,
     severity_score,
@@ -100,6 +101,7 @@ __all__ = [
     "RuleDetector",
     "StructuralDetector",
     "EncodedPayloadDetector",
+    "ObfuscationDetector",
     "ModelDetector",
     "ModelScorer",
     # free-text PII seam (bring your own recognizer)

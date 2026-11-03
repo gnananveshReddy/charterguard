@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 from collections.abc import Callable, Mapping, Sequence
@@ -45,6 +46,49 @@ __all__ = [
 ]
 
 _RETRY_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
+_CREDENTIAL_HEADERS = frozenset({"authorization", "x-api-key", "api-key", "proxy-authorization"})
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect.
+
+    urllib follows 301/302/303 by default and re-sends ordinary request headers,
+    including ``Authorization`` and ``x-api-key``, to the new location. For a
+    client that carries a credential and prompt content, a redirect is either a
+    misconfigured URL or an attempt to move both somewhere else -- possibly to
+    plaintext http. Failing loudly makes the operator configure the final URL.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        return None
+
+
+# A private opener: installing a global opener would change urllib behaviour for
+# the host application.
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
+def _validate_endpoint(url: str, headers: Mapping[str, str] | None, allow_insecure_http: bool) -> None:
+    """Allow ``https``, and ``http`` only on explicit opt-in. Nothing else.
+
+    A prefix check is not enough: with the opt-in set, ``file://``, ``ftp://``
+    or a custom scheme would otherwise reach ``urlopen``, which reads local
+    files for ``file:``.
+    """
+    parts = urllib.parse.urlsplit(url)
+    scheme = parts.scheme.lower()
+    if scheme not in {"https", "http"}:
+        raise ValueError(f"unsupported URL scheme {parts.scheme!r} in {url!r}; use https")
+    if not parts.hostname:
+        raise ValueError(f"URL has no host: {url!r}")
+    if scheme == "http":
+        if not allow_insecure_http:
+            raise ValueError(
+                f"refusing to send prompt content in cleartext to {url!r}; "
+                "pass allow_insecure_http=True only for localhost or an in-mesh sidecar"
+            )
+        if {k.lower() for k in (headers or {})} & _CREDENTIAL_HEADERS:
+            raise ValueError("refusing to send a credential header over plaintext http; use https")
 
 
 class HttpError(RuntimeError):
@@ -72,20 +116,9 @@ class _JsonClient:
         max_chars: int = 20_000,
         allow_insecure_http: bool = False,
     ) -> None:
-        secure = url.startswith("https://")
-        if not secure:
-            if not allow_insecure_http:
-                raise ValueError(
-                    f"refusing to send prompt content in cleartext to {url!r}; "
-                    "pass allow_insecure_http=True only for localhost or an in-mesh sidecar"
-                )
-            lowered = {k.lower() for k in (headers or {})}
-            if lowered & {"authorization", "x-api-key", "api-key"}:
-                raise ValueError(
-                    "refusing to send a credential header over plaintext http; use https"
-                )
+        _validate_endpoint(url, headers, allow_insecure_http)
         self.url = url
-        self.headers = {"content-type": "application/json", **{k: v for k, v in (headers or {}).items()}}
+        self.headers = {"content-type": "application/json", **dict(headers or {})}
         self.timeout_s = timeout_s
         self.max_retries = max_retries
         self.backoff_s = backoff_s
@@ -95,11 +128,18 @@ class _JsonClient:
         body = json.dumps(payload).encode("utf-8")
         last: Exception | None = None
         for attempt in range(self.max_retries + 1):
-            req = urllib.request.Request(self.url, data=body, headers=self.headers, method="POST")
+            req = urllib.request.Request(self.url, data=body, headers=self.headers, method="POST")  # noqa: S310 - scheme validated in __init__
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+                # Scheme and host were validated in __init__; redirects are refused.
+                with _OPENER.open(req, timeout=self.timeout_s) as resp:  # noqa: S310
                     return json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as exc:
+                if 300 <= exc.code < 400:
+                    raise HttpError(
+                        f"{self.url} redirected ({exc.code}); refusing to follow -- "
+                        "configure the final URL",
+                        status=exc.code,
+                    ) from exc
                 last = HttpError(f"{self.url} returned {exc.code}", status=exc.code)
                 if exc.code not in _RETRY_STATUS:
                     raise last from exc
