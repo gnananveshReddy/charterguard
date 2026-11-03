@@ -12,6 +12,8 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Pydantic AI integration: `guard_capability(pipeline)` checks the prompt, tool
+  calls, tool results and final output of an agent run (`[pydantic-ai]` extra).
 - Documentation site (`mkdocs.yml`, mkdocs-material, built `--strict` in CI and
   deployed to GitHub Pages from `main`), split from the README, plus a "How it
   compares" page. The README is now a short overview that links into the docs.

@@ -109,6 +109,22 @@ output, or output carrying secrets or PII, with a same-shape redacted or withhel
 match the tool's schema, so for tools you control, guarding inside the tool (or
 serving it through `charterguard mcp`) is still the strongest option.
 
+**Pydantic AI** (`pip install "charterguard[pydantic-ai]"`):
+
+```python
+from charterguard.integrations.pydantic_ai import guard_capability
+
+agent = Agent("openai:gpt-5", capabilities=[guard_capability(pipeline)])
+```
+
+One capability covers the whole run. A blocked prompt raises `GuardrailBlocked` before
+any model request. A blocked tool call is skipped, and the model gets a refusal as the
+tool result. Quarantined or redacted tool results are replaced with the enveloped text.
+The final output is checked too: a block raises, and plain-text output comes back
+redacted. Structured outputs are checked (and can block) but are not rewritten. The
+session id defaults to the run's `conversation_id`; pass `session_id=` to derive it
+from your deps.
+
 ## MCP
 
 `charterguard mcp` runs an [MCP](https://modelcontextprotocol.io) server over stdio
