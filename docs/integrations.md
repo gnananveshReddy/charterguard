@@ -121,9 +121,10 @@ One capability covers the whole run. A blocked prompt raises `GuardrailBlocked` 
 any model request. A blocked tool call is skipped, and the model gets a refusal as the
 tool result. Quarantined or redacted tool results are replaced with the enveloped text.
 The final output is checked too: a block raises, and plain-text output comes back
-redacted. Structured outputs are checked (and can block) but are not rewritten. The
-session id defaults to the run's `conversation_id`; pass `session_id=` to derive it
-from your deps.
+redacted. A structured output is rebuilt from its redacted JSON, and the run raises if
+that is not possible, so a redaction is never silently dropped. The session id defaults
+to the run's `conversation_id`, which stays stable across runs that continue a
+`message_history`. Pass `session_id=` to derive it from your deps.
 
 ## MCP
 

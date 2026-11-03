@@ -15,11 +15,12 @@ The capability hooks every stage of a run:
   replaced by the enveloped text, so the model never sees the raw content.
 * **final output** -- `check_output`. A blocked output raises
   `GuardrailBlocked`; a plain-text output with redactions is returned redacted.
-  Structured outputs are checked (and can block) but are not rewritten.
+  A structured output (a pydantic model, dict or list) is rebuilt from its
+  redacted JSON; if that fails, the run raises rather than leak.
 
 The session id (per-conversation ceilings) defaults to the run's
-``conversation_id``, falling back to its ``run_id``; pass ``session_id`` to
-derive it from your deps instead.
+``conversation_id``, which pydantic-ai keeps stable across runs that continue
+a ``message_history``. Pass ``session_id`` to derive it from your deps instead.
 
 Message history passed in with ``message_history=`` is not rescanned: it was
 checked when it was produced. Requires ``pydantic-ai-slim`` (imported when the
@@ -82,6 +83,31 @@ def _text(value: object) -> str:
         return str(value)
 
 
+_UNREBUILDABLE = object()
+
+
+def _rebuild(output: object, sanitized_json: str) -> object:
+    """The structured ``output`` again, from its redacted JSON dump.
+
+    Returns `_UNREBUILDABLE` when the redacted text no longer parses or
+    validates, or the type is not one we know how to rebuild; the caller then
+    fails closed rather than returning the unredacted original.
+    """
+    try:
+        data = json.loads(sanitized_json)
+    except ValueError:
+        return _UNREBUILDABLE
+    validate = getattr(type(output), "model_validate", None)
+    if callable(validate):
+        try:
+            return validate(data)
+        except Exception:  # noqa: BLE001 - any validation failure means fail closed
+            return _UNREBUILDABLE
+    if isinstance(output, dict | list) and isinstance(data, type(output)):
+        return data
+    return _UNREBUILDABLE
+
+
 def guard_capability(
     pipeline: GuardrailPipeline,
     *,
@@ -100,7 +126,9 @@ def guard_capability(
     def sid(ctx: Any) -> str:
         if session_id is not None:
             return session_id(ctx)
-        return str(getattr(ctx, "conversation_id", None) or getattr(ctx, "run_id", None) or _DEFAULT_SESSION)
+        # Never the run id: it is new on every run, so per-session ceilings
+        # would reset each turn. Without a conversation id, share one key.
+        return str(getattr(ctx, "conversation_id", None) or _DEFAULT_SESSION)
 
     def blocked(verdict: Verdict) -> GuardrailBlocked:
         return GuardrailBlocked(verdict, pipeline.refusal(verdict))
@@ -142,8 +170,16 @@ def guard_capability(
             verdict = pipeline.check_output(_text(output), session_id=sid(ctx))
             if verdict.blocked:
                 raise blocked(verdict)
-            if isinstance(output, str) and verdict.sanitized is not None:
+            if not int(verdict.meta.get("redaction_count", 0)) or verdict.sanitized is None:
+                return output
+            if isinstance(output, str):
                 return verdict.sanitized
-            return output
+            rebuilt = _rebuild(output, verdict.sanitized)
+            if rebuilt is _UNREBUILDABLE:
+                # Fail closed: returning the original would leak what was redacted.
+                raise GuardrailBlocked(
+                    verdict, "The answer contained data that must be redacted and could not be rebuilt."
+                )
+            return rebuilt
 
     return CharterGuardCapability()

@@ -166,3 +166,71 @@ def test_structured_outputs_are_checked_too():
         assert exc.verdict.blocked
     else:
         assert pipeline.check_output(f"the key is {SECRET}").sanitized, "neither blocked nor redactable"
+
+
+# ------------------------------------------------- security review regressions
+def _structured_agent(pipeline: GuardrailPipeline, text: str, output_type: Any) -> Any:
+    from pydantic_ai import Agent
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from pydantic_ai.models.function import FunctionModel
+
+    def model(messages: Any, info: Any) -> Any:
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"text": text, "n": 3})])
+
+    return Agent(FunctionModel(model), output_type=output_type, capabilities=[guard_capability(pipeline)])
+
+
+def test_pii_in_a_structured_output_is_redacted_not_passed_through():
+    if not have_pydantic_ai():
+        return
+    from pydantic import BaseModel
+
+    class Answer(BaseModel):
+        text: str
+        n: int
+
+    email = "jane.doe@example.com"
+    result = _structured_agent(GuardrailPipeline(), f"mail {email} now", Answer).run_sync("who?")
+    assert isinstance(result.output, Answer)
+    assert email not in result.output.text and result.output.n == 3
+
+
+def test_a_structured_output_that_cannot_be_rebuilt_fails_closed():
+    if not have_pydantic_ai():
+        return
+    from dataclasses import dataclass
+
+    @dataclass
+    class Plain:
+        text: str
+        n: int
+
+    email = "jane.doe@example.com"
+    try:
+        result = _structured_agent(GuardrailPipeline(), f"mail {email} now", Plain).run_sync("who?")
+    except GuardrailBlocked:
+        return
+    raise AssertionError(f"returned unredacted output: {result.output!r}")
+
+
+def test_the_session_is_the_conversation_not_the_run():
+    if not have_pydantic_ai():
+        return
+    from pydantic_ai import Agent
+    from pydantic_ai.messages import ModelResponse, TextPart
+    from pydantic_ai.models.function import FunctionModel
+
+    seen: list[str] = []
+
+    class Recording(GuardrailPipeline):
+        def check_output(self, text: str, **kw: Any) -> Any:
+            seen.append(kw["session_id"])
+            return super().check_output(text, **kw)
+
+    agent = Agent(
+        FunctionModel(lambda m, i: ModelResponse(parts=[TextPart("hi")])),
+        capabilities=[guard_capability(Recording())],
+    )
+    first = agent.run_sync("one")
+    agent.run_sync("two", message_history=first.all_messages())
+    assert len(seen) == 2 and seen[0] == seen[1], seen
