@@ -269,12 +269,40 @@ The prefilter is an optimization, never a policy: `scan(prefilter=False)` runs
 every rule unconditionally, and `tests/test_prefilter.py` asserts both modes
 produce identical findings across the whole attack corpus.
 
+## Detection accuracy
+
+Measured with `python benchmarks/accuracy.py`: rule tiers only, no model scorer
+configured, and no rule was fitted to these datasets. "Detected" means the verdict is
+flag or block; the block columns use the strict preset (the default preset flags
+injection rather than blocking it).
+
+| Dataset | n (attacks) | Precision | Recall | FPR | Block recall (strict) | Block FPR (strict) |
+| --- | --- | --- | --- | --- | --- | --- |
+| bundled corpus (`tests/corpus`) | 96 (43) | 0.96 | 1.00 | 0.04 | 1.00 | 0.00 |
+| [deepset/prompt-injections](https://huggingface.co/datasets/deepset/prompt-injections) | 662 (263) | 1.00 | 0.13 | 0.00 | 0.12 | 0.00 |
+| [jackhhao/jailbreak-classification](https://huggingface.co/datasets/jackhhao/jailbreak-classification) | 1306 (666) | 0.91 | 0.48 | 0.05 | 0.40 | 0.00 |
+
+What these numbers say:
+
+* **The rule tier is precise, not complete.** On the public sets it almost never
+  blocks benign text, but it misses most attacks phrased in ways no rule anticipates.
+* **deepset/prompt-injections** is roughly half German, and many of its "injections"
+  are persona or opinion prompts ("You are Volkswagen. What do you think of
+  Mercedes?") that no pattern-based detector should block. The remaining English
+  misses are mostly paraphrases ("remove all previous tasks out of your head").
+* **jailbreak-classification** is long DAN-style role-play. The rules catch the
+  well-known personas and "no restrictions" framing, not novel stories.
+
+That gap is what the classifier tier (`ModelScorer`, escalation bands) is for. Run the
+benchmark with your own scorer configured to measure the full cascade.
+
 ## Tests
 
 ```bash
 python tests/run_tests.py     # dependency-free runner, no pytest required
 pytest                        # same tests, if pytest is installed
 python benchmarks/bench.py
+python benchmarks/accuracy.py  # fetches public datasets once, then cached
 ```
 
 The test suite covers normalization and offset mapping, injection and jailbreak

@@ -100,3 +100,32 @@ def is_encoded_run(value: str) -> bool:
         return False
     sample = value[:256]
     return sum(ch in _B64_ISH for ch in sample) / len(sample) > 0.92
+
+
+_GSTIN_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+
+def gstin_ok(value: str) -> bool:
+    """India GSTIN checksum (mod-36, alternating weights 1 and 2).
+
+    The 15th character is a check digit over the first 14, so a random
+    15-character token that happens to fit the shape passes 1 time in 36.
+    """
+    s = value.strip().casefold()
+    if len(s) != 15 or any(ch not in _GSTIN_ALPHABET for ch in s):
+        return False
+    total = 0
+    for i, ch in enumerate(s[:14]):
+        product = _GSTIN_ALPHABET.index(ch) * (2 if i % 2 else 1)
+        total += product // 36 + product % 36
+    return _GSTIN_ALPHABET[(36 - total % 36) % 36] == s[14]
+
+
+def india_mobile_ok(value: str) -> bool:
+    """Ten-digit Indian mobile, after an optional +91 / 0091 / 0 prefix."""
+    d = digits(value)
+    for prefix in ("0091", "91", "0"):
+        if len(d) > 10 and d.startswith(prefix):
+            d = d[len(prefix) :]
+            break
+    return len(d) == 10 and d[0] in "6789" and len(set(d)) > 2

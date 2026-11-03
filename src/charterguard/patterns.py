@@ -414,8 +414,37 @@ _PII: tuple[Rule, ...] = (
          r"\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b", "US SSN"),
     Rule("pii.aadhaar", Category.PII, Severity.HIGH,
          r"\b[2-9]\d{3}[\s\-]?\d{4}[\s\-]?\d{4}\b", "Aadhaar (IN)", _ALL_LAYERS, "verhoeff"),
+    # The 4th letter is the holder type (P person, C company, H HUF, F firm,
+    # A AOP, T trust, B BOI, L local authority, J juristic person, G govt).
+    # A known holder type raises confidence; the bare shape is still redacted
+    # (LOW) so a code missing from that list never leaks unredacted.
     Rule("pii.pan.in", Category.PII, Severity.MEDIUM,
-         r"\b[a-z]{5}\d{4}[a-z]\b", "PAN (IN)"),
+         r"\b[a-z]{3}[pcfhatblgj][a-z]\d{4}[a-z]\b", "PAN (IN)"),
+    Rule("pii.pan.in.shape", Category.PII, Severity.LOW,
+         r"\b[a-z]{5}\d{4}[a-z]\b", "PAN-shaped identifier (IN)"),
+    # State code + the holder's PAN + entity number + 'Z' + mod-36 check
+    # digit. The checksum carries precision, so the PAN part is not narrowed.
+    Rule("pii.gstin.in", Category.PII, Severity.MEDIUM,
+         r"\b(?:0[1-9]|[1-3]\d|97|99)[a-z]{5}\d{4}[a-z][1-9a-z]z[0-9a-z]\b",
+         "GSTIN (IN)", _ALL_LAYERS, "gstin"),
+    # "98765 43210" -- the usual Indian grouping -- is 5+5 digits, which the
+    # generic phone shape cannot split.
+    Rule("pii.phone.in", Category.PII, Severity.LOW,
+         r"(?<![\d+])(?:(?:\+|00)91[\s\-]?|0)?[6-9]\d{4}[\s\-]?\d{5}\b",
+         "Mobile number (IN)", _ALL_LAYERS, "india_mobile"),
+    # VPA handles of the major UPI apps and banks. A bare "@bank" handle has
+    # no TLD; "user@sbi.co.in" is an email and is left to pii.email.
+    Rule("pii.upi.in", Category.PII, Severity.LOW,
+         r"\b[a-z0-9][a-z0-9.\-_]{1,63}@(?:ok(?:axis|sbi|hdfcbank|icici)|ybl|ibl|axl|paytm|apl|yapl|"
+         r"pt(?:yes|axis|hdfc|sbi)|upi|axisbank|axisb|icici|hdfcbank|sbi|kotak|federal|indus|"
+         r"yesbank|idfcbank|pnb|barodampay|unionbank|airtel|freecharge|jio|naviaxis|"
+         r"wa(?:axis|hdfcbank|sbi|icici)|fbl|rbl|aubank|kbl|jupiteraxis|abfspay|dbs|citi|hsbc)"
+         r"(?!\.?[a-z0-9])",
+         "UPI ID (IN)"),
+    # Letter + 7 digits; far too common a shape to match without the word.
+    Rule("pii.passport.in", Category.PII, Severity.MEDIUM,
+         r"passport\s*(?:no\.?|number|#)?[\s:.#\-]{0,4}[a-z][1-9]\d{5}[1-9]\b",
+         "Passport number (IN)"),
     Rule("pii.iban", Category.PII, Severity.MEDIUM,
          r"\b[a-z]{2}\d{2}[a-z0-9]{10,30}\b", "IBAN"),
     Rule("pii.mrn", Category.PII, Severity.MEDIUM,
