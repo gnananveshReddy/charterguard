@@ -64,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        extra: [fastapi, langchain, langgraph, redis, prometheus, otel, onnx, openai-agents, claude-agent-sdk]
+        extra: [fastapi, langchain, langgraph, redis, prometheus, otel, onnx, openai-agents, claude-agent-sdk, pydantic-ai]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
@@ -95,6 +95,7 @@ jobs:
               "onnx": "charterguard.integrations.onnx_model",
               "openai-agents": "charterguard.integrations.openai_agents",
               "claude-agent-sdk": "charterguard.integrations.claude_agent_sdk",
+              "pydantic-ai": "charterguard.integrations.pydantic_ai",
           }[extra]
           m = importlib.import_module(module)
           print("imported", module, "->", len(getattr(m, "__all__", dir(m))), "names")
@@ -149,7 +150,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install every extra
-        run: pip install -e ".[fastapi,langchain,langgraph,redis,prometheus,otel,onnx,openai-agents,claude-agent-sdk,dev]"
+        run: pip install -e ".[fastapi,langchain,langgraph,redis,prometheus,otel,onnx,openai-agents,claude-agent-sdk,pydantic-ai,dev]"
       - name: Importing the package must not pull an optional dependency in
         run: |
           python - <<'PY'
@@ -158,7 +159,7 @@ jobs:
           import charterguard.integrations as ints  # noqa: F401
           optional = ("fastapi", "langchain_core", "langgraph", "redis",
                       "prometheus_client", "opentelemetry", "onnxruntime",
-                      "agents", "claude_agent_sdk")
+                      "agents", "claude_agent_sdk", "pydantic_ai")
           leaked = sorted({m.split(".")[0] for m in sys.modules} & set(optional))
           assert not leaked, f"import pulled optional dependencies: {leaked}"
 

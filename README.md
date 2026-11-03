@@ -67,7 +67,7 @@ charterguard scan --layer tool --pack agent-tools fetched_page.html
 | **Detection** | Injection and jailbreak rules (English plus seed coverage for 26 more languages, including 10 Indian languages and Hinglish), encoded-payload decoding, de-obfuscation (leetspeak, letter spacing, rot13, quote wrapping), destructive commands, exfiltration beacons |
 | **Data protection** | Secret and PII redaction with checksum validators (cards, IBAN, Aadhaar, PAN, GSTIN, ...) and exact-span placeholders |
 | **Agent controls** | Charter-based scope gate, tool allow-lists, per-session volume ceilings, untrusted-content envelopes, grounding checks |
-| **Integrations** | FastAPI, LangChain and LangGraph, OpenAI Agents SDK, Claude Agent SDK, MCP (server and result guard), CLI and pre-commit hook |
+| **Integrations** | FastAPI, LangChain and LangGraph, OpenAI Agents SDK, Claude Agent SDK, Pydantic AI, MCP (server and result guard), CLI and pre-commit hook |
 | **Operations** | TOML policy files, self-testing [rule packs](docs/rule-packs.md), shadow and report-only rollout, hash-chained audit, metrics sinks, optional classifier tier (`.[onnx]`) |
 
 ## Accuracy, honestly
