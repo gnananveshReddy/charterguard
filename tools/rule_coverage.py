@@ -31,8 +31,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from agent_guardrails import GuardrailPipeline  # noqa: E402
-from agent_guardrails.patterns import RULES  # noqa: E402
+from charterguard import GuardrailPipeline  # noqa: E402
+from charterguard.patterns import RULES  # noqa: E402
 
 CORPORA = (
     ROOT / "tests" / "corpus" / "attacks.jsonl",
@@ -66,7 +66,7 @@ def main(argv: list[str]) -> int:
 
     from dataclasses import replace as _replace
 
-    from agent_guardrails.config import GuardrailConfig
+    from charterguard.config import GuardrailConfig
 
     pipeline = GuardrailPipeline(
         _replace(GuardrailConfig(), short_circuit_on_critical=False)

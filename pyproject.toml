@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent-guardrails"
-version = "1.6.0"
+name = "charterguard"
+version = "0.1.0"
 description = "Framework-agnostic guardrail pipeline for LLM agent harnesses: injection, jailbreak, scope, redaction, grounding, audit."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,15 +37,47 @@ presidio = ["presidio-analyzer>=2.2", "spacy>=3.7"]
 # and no weights are bundled. Weights are fetched by pinned commit SHA and
 # verified by SHA-256 at load. See SECURITY.md.
 onnx = ["onnxruntime>=1.17", "tokenizers>=0.15"]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.6", "mypy>=1.10", "pre-commit>=3.7"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_guardrails"]
+packages = ["src/charterguard"]
 # py.typed ships the annotations: the Protocol seams are the public API, and
 # without this marker every downstream type checker sees them as Any.
-artifacts = ["src/agent_guardrails/py.typed"]
+artifacts = ["src/charterguard/py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# E/F: correctness. B: bugbear. S: bandit -- this is a security component, so
+# its own code is held to security lint. UP/SIM: modern, simple Python.
+select = ["E", "F", "W", "B", "S", "UP", "SIM"]
+ignore = [
+    "SIM105",  # try/except/pass keeps the "why this must never raise" comment in place
+    "SIM108",  # ternaries over multi-clause conditions hurt readability
+    "UP042",  # (str, Enum) is kept: StrEnum changes str() output, a public behaviour
+    # Deferred to the security-hardening change, which fixes them rather than
+    # silencing them: URL scheme allowlists for urlopen, validated SQL identifiers.
+    "S310",
+    "S608",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S108", "S311", "S603", "S607", "E501"]
+"benchmarks/**" = ["S101", "S311", "E501"]
+"tools/**" = ["S101"]
+# Rule tables and literal lists: one entry per line reads better than wrapping
+# a regex mid-alternation.
+"src/charterguard/patterns.py" = ["E501"]
+"src/charterguard/prefilter.py" = ["E501"]
+"src/charterguard/integrations/heuristics.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true

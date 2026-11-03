@@ -2,10 +2,10 @@ import re
 
 import pytest
 
-from agent_guardrails.patterns import RULES, PatternError, Rule
-from agent_guardrails.scanner import CompiledRuleSet
-from agent_guardrails.patterns import rules_for
-from agent_guardrails.types import Category, Layer, Severity
+from charterguard.patterns import RULES, PatternError, Rule
+from charterguard.scanner import CompiledRuleSet
+from charterguard.patterns import rules_for
+from charterguard.types import Category, Layer, Severity
 
 
 def test_all_rules_compile():
@@ -49,7 +49,7 @@ def test_almost_every_rule_carries_a_prefilter_condition():
 
 def test_validated_rules_do_not_shadow_each_other():
     """A 12-digit Aadhaar candidate must not consume a 16-digit card."""
-    from agent_guardrails.detectors.base import RuleDetector
+    from charterguard.detectors.base import RuleDetector
 
     rs = CompiledRuleSet(rules_for(layer=Layer.OUTPUT))
     hits = {m.rule.id for m in rs.scan("card 4111 1111 1111 1111", keep=RuleDetector._keep)}
@@ -57,7 +57,7 @@ def test_validated_rules_do_not_shadow_each_other():
 
 
 def test_rejected_numeric_run_does_not_slide_into_a_false_positive():
-    from agent_guardrails.detectors.base import RuleDetector
+    from charterguard.detectors.base import RuleDetector
 
     rs = CompiledRuleSet(rules_for(layer=Layer.OUTPUT))
     hits = {m.rule.id for m in rs.scan("order 1234 5678 9012 3456", keep=RuleDetector._keep)}

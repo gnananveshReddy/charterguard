@@ -1,4 +1,4 @@
-from agent_guardrails import Charter, GuardrailConfig, GuardrailPipeline
+from charterguard import Charter, GuardrailConfig, GuardrailPipeline
 
 CHARTER = Charter(
     agent_id="policy-qa",

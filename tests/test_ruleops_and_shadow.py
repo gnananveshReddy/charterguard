@@ -9,12 +9,12 @@ import time
 
 import pytest
 
-from agent_guardrails import GuardrailPipeline, GuardrailConfig
-from agent_guardrails.patterns import RULES
-from agent_guardrails.policy import decide
-from agent_guardrails.ruleops import RuleHealth
-from agent_guardrails.shadow import ShadowPolicy
-from agent_guardrails.types import Action, Category, Finding, Layer, Mode, Severity, Verdict
+from charterguard import GuardrailPipeline, GuardrailConfig
+from charterguard.patterns import RULES
+from charterguard.policy import decide
+from charterguard.ruleops import RuleHealth
+from charterguard.shadow import ShadowPolicy
+from charterguard.types import Action, Category, Finding, Layer, Mode, Severity, Verdict
 
 
 def _finding(rule_id: str, category: Category = Category.INJECTION, score: float = 0.7) -> Finding:

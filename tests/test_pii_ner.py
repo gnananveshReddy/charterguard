@@ -6,14 +6,14 @@ identically to rule findings by redaction and policy.
 """
 from __future__ import annotations
 
-from agent_guardrails import GuardrailPipeline
-from agent_guardrails.detectors import (
+from charterguard import GuardrailPipeline
+from charterguard.detectors import (
     EncodedPayloadDetector,
     RuleDetector,
     StructuralDetector,
 )
-from agent_guardrails.pii import Entity, EntityDetector
-from agent_guardrails.types import Category, Severity
+from charterguard.pii import Entity, EntityDetector
+from charterguard.types import Category, Severity
 
 TEXT = "Priya Sharma was discharged on Tuesday after treatment."
 

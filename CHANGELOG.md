@@ -7,6 +7,25 @@ changes verdicts on traffic that previously passed -- treat every minor upgrade
 as a policy change and shadow it before enforcing (see `ShadowPolicy`).
 
 
+Until 1.0 the public API may change in minor releases; pin an exact version.
+
+## [Unreleased]
+
+## [0.1.0]
+
+First public release under the name **charterguard**.
+
+### Changed
+- Renamed the distribution and import package from `agent-guardrails` /
+  `agent_guardrails` to `charterguard`. The PyPI name `agent-guardrails` belongs
+  to an unrelated project. Update imports:
+  `from agent_guardrails import ...` -> `from charterguard import ...`.
+- Version reset to `0.1.0`. The package was previously developed privately with
+  internal version numbers up to 1.6.0; those numbers never shipped and carry no
+  compatibility promise. The history below records that pre-release work.
+
+## Pre-release history
+
 ### Added
 - **Async streaming enforcement.** `AsyncStreamGuard` mirrors `StreamGuard` for
   async token streams. Both now share one hold-back state machine, so they

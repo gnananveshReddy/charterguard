@@ -20,6 +20,7 @@ Two questions this answers, both of which are easy to get wrong by intuition:
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import tempfile
 import time
@@ -27,26 +28,26 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from agent_guardrails.integrations.heuristics import (  # noqa: E402
+from charterguard.integrations.heuristics import (  # noqa: E402
     GazetteerEntityRecognizer,
     KeywordIntentClassifier,
 )
-from agent_guardrails.integrations.logging_metrics import (  # noqa: E402
+from charterguard.integrations.logging_metrics import (  # noqa: E402
     ConsoleMetricsSink,
     LoggingMetricsSink,
     StatsdMetricsSink,
 )
-from agent_guardrails.integrations.sqlite_backends import (  # noqa: E402
+from charterguard.integrations.sqlite_backends import (  # noqa: E402
     SqliteAuditSink,
     SqliteCounterStore,
 )
-from agent_guardrails.integrations import langgraph as lg  # noqa: E402
-from agent_guardrails.integrations import _lc_guards as lcg  # noqa: E402
-from agent_guardrails.config import GuardrailConfig  # noqa: E402
-from agent_guardrails.ledger import InMemoryCounterStore  # noqa: E402
-from agent_guardrails.pipeline import GuardrailPipeline  # noqa: E402
-from agent_guardrails.observability import InMemoryMetrics, NullMetrics  # noqa: E402
-from agent_guardrails.types import Action, Layer, Verdict  # noqa: E402
+from charterguard.integrations import langgraph as lg  # noqa: E402
+from charterguard.integrations import _lc_guards as lcg  # noqa: E402
+from charterguard.config import GuardrailConfig  # noqa: E402
+from charterguard.ledger import InMemoryCounterStore  # noqa: E402
+from charterguard.pipeline import GuardrailPipeline  # noqa: E402
+from charterguard.observability import InMemoryMetrics, NullMetrics  # noqa: E402
+from charterguard.types import Action, Layer, Verdict  # noqa: E402
 
 N = 20_000
 
@@ -79,7 +80,7 @@ def bench_metrics() -> None:
 
     loud = logging.getLogger("bench.loud")
     loud.setLevel(logging.INFO)
-    devnull = open("/dev/null", "w")
+    devnull = open(os.devnull, "w")  # noqa: SIM115 - lives for the whole benchmark
     handler = logging.StreamHandler(devnull)
     handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
     loud.addHandler(handler)
@@ -254,7 +255,7 @@ def bench_streaming() -> None:
             row.append((time.perf_counter() - start) / (reps * tokens) * 1e6)
         speedup = row[0] / row[1] if row[1] else float("inf")
         print(
-            f"  {'%d-token response' % tokens:<24}"
+            f"  {f'{tokens}-token response':<24}"
             f"{row[0]:>9.1f} -> {row[1]:>7.1f} us/token  ({speedup:>5.1f}x)"
         )
     loop.close()

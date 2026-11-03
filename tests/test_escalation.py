@@ -9,13 +9,12 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 
-import pytest
 
-from agent_guardrails import GuardrailPipeline
-from agent_guardrails.config import GuardrailConfig, ModelTier
-from agent_guardrails.detectors.model import ModelDetector
-from agent_guardrails.normalize import normalize
-from agent_guardrails.types import Category, Layer
+from charterguard import GuardrailPipeline
+from charterguard.config import GuardrailConfig, ModelTier
+from charterguard.detectors.model import ModelDetector
+from charterguard.normalize import normalize
+from charterguard.types import Category, Layer
 
 
 class StubScorer:

@@ -11,8 +11,8 @@ import json
 import os
 from pathlib import Path
 
-from agent_guardrails import GuardrailPipeline
-from agent_guardrails.types import Action
+from charterguard import GuardrailPipeline
+from charterguard.types import Action
 
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 

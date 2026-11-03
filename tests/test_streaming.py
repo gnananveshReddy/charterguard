@@ -7,9 +7,9 @@ a pattern straddling a chunk boundary is still caught.
 """
 from __future__ import annotations
 
-from agent_guardrails import GuardrailPipeline
-from agent_guardrails.streaming import StreamGuard
-from agent_guardrails.types import Action, Layer, Verdict
+from charterguard import GuardrailPipeline
+from charterguard.streaming import StreamGuard
+from charterguard.types import Action, Layer, Verdict
 
 SECRET = "sk_live_4eC39HqLyjWDarjtT1zdp7dc"
 
