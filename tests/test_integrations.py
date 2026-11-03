@@ -634,7 +634,9 @@ def test_missing_extra_raises_an_actionable_import_error():
         try:
             cls() if name != "OnnxModelScorer" else cls
         except ImportError as exc:
-            assert f"charterguard[{extra}]" in str(exc)
+            # Either the extra is missing, or (spaCy installed) its model is:
+            # both messages must say what to run.
+            assert f"charterguard[{extra}]" in str(exc) or "spacy download" in str(exc), str(exc)
         except Exception:  # noqa: S110
             pass  # constructed far enough to need real config; the guard is not the issue
 

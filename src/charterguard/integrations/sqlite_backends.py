@@ -49,6 +49,28 @@ if not all(f.isidentifier() and f.isascii() for f in _FIELDS):  # pragma: no cov
 _COLS = ", ".join(_FIELDS)
 
 
+def _enable_wal(conn: sqlite3.Connection, timeout_s: float) -> None:
+    """Switch to WAL, retrying while another connection holds the lock.
+
+    Changing the journal mode can fail with SQLITE_BUSY at once, without
+    consulting the busy handler, when several processes open a fresh database
+    together. Retry with backoff until the busy timeout is spent.
+    """
+    deadline = time.monotonic() + timeout_s
+    delay = 0.005
+    while True:
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+            return
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc) and "busy" not in str(exc):
+                raise
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(delay)
+            delay = min(delay * 2, 0.1)
+
+
 class SqliteCounterStore:
     """`CounterStore` shared by every process on one host.
 
@@ -88,7 +110,7 @@ class SqliteCounterStore:
             if self._path != ":memory:":
                 # WAL survives across connections and processes; skip for
                 # :memory:, where it is meaningless.
-                conn.execute("PRAGMA journal_mode = WAL")
+                _enable_wal(conn, self._busy_timeout_s)
             conn.execute("PRAGMA synchronous = NORMAL")
             self._local.conn = conn
         return conn
@@ -212,7 +234,7 @@ class SqliteAuditSink:
             conn = sqlite3.connect(self._path, timeout=self._busy_timeout_s, isolation_level=None)
             conn.execute(f"PRAGMA busy_timeout = {int(self._busy_timeout_s * 1000)}")
             if self._path != ":memory:":
-                conn.execute("PRAGMA journal_mode = WAL")
+                _enable_wal(conn, self._busy_timeout_s)
             conn.execute("PRAGMA synchronous = FULL")  # audit durability over speed
             self._local.conn = conn
         return conn

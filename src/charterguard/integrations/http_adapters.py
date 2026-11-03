@@ -134,6 +134,9 @@ class _JsonClient:
                 with _OPENER.open(req, timeout=self.timeout_s) as resp:  # noqa: S310
                     return json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as exc:
+                # An HTTPError carries the open response; close it or the
+                # socket leaks on every error or redirect status.
+                exc.close()
                 if 300 <= exc.code < 400:
                     raise HttpError(
                         f"{self.url} redirected ({exc.code}); refusing to follow -- "

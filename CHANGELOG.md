@@ -12,6 +12,9 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Browser playground on the docs site (`docs/playground.md`): the package's own
+  wheel, built by `scripts/build_playground.py` in the docs workflow, runs in
+  Pyodide. Nothing typed into it leaves the browser.
 - Pinned ONNX preset: `onnx_presets.injection_scorer()` loads
   protectai/deberta-v3-base-prompt-injection-v2 by commit SHA with verified
   SHA-256 digests. `benchmarks/accuracy.py --model PRESET` measures the full

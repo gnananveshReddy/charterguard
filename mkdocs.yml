@@ -29,6 +29,7 @@ markdown_extensions:
 
 nav:
   - Overview: index.md
+  - Playground: playground.md
   - Guides:
       - Integrations: integrations.md
       - Untrusted content: untrusted-content.md
