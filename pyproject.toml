@@ -33,7 +33,7 @@ redis = ["redis>=5.0"]
 prometheus = ["prometheus-client>=0.20"]
 otel = ["opentelemetry-api>=1.24"]
 # Free-text PII (names, locations). Both also require a spaCy model download,
-# which pip cannot express -- see docs/ADAPTERS.md.
+# which pip cannot express -- see docs/adapters.md.
 spacy = ["spacy>=3.7"]
 presidio = ["presidio-analyzer>=2.2", "spacy>=3.7"]
 # Local model tier. onnxruntime + tokenizers only: no torch, no transformers,

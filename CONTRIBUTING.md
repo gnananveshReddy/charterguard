@@ -32,6 +32,16 @@ mypy src/charterguard
 CI runs the suite bare on Python 3.11–3.13, once per optional extra, and with every
 extra installed, to show that imports stay lazy.
 
+### Documentation
+
+The docs live in `docs/` and build with mkdocs-material:
+
+```bash
+pip install -r docs/requirements.txt
+mkdocs serve        # live preview at http://127.0.0.1:8000
+mkdocs build --strict
+```
+
 ## Reporting a missed attack or a false positive
 
 Use the issue templates. The fastest path to a fix is a pull request that adds the
@@ -91,7 +101,7 @@ forms.
 * Keep a PR to one concern; stacked PRs are fine.
 * Lint, types and tests must pass; CI enforces all three.
 * New public API needs type hints, a docstring, and a README or
-  `docs/ADAPTERS.md` mention.
+  `docs/adapters.md` mention.
 * Adapters import their framework lazily, inside the factory, and must be
   testable without it.
 * Reports, logs and exceptions must never contain matched secret or PII text.
