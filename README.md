@@ -86,6 +86,7 @@ See [Detection accuracy](docs/accuracy.md) and [How it compares](docs/comparison
 ## Documentation
 
 * [Overview and trust boundaries](docs/index.md)
+* [Playground](docs/playground.md): try it in the browser (Pyodide, on the docs site)
 * [Integrations](docs/integrations.md): FastAPI, LangChain/LangGraph, agent SDKs, MCP
 * [Untrusted content and envelopes](docs/untrusted-content.md)
 * [Policy files](docs/policy.md) · [Rule packs](docs/rule-packs.md) · [Command line](docs/cli.md)

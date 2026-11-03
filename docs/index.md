@@ -9,6 +9,8 @@ and audit-ready verdicts.
 Zero runtime dependencies. Python 3.11+. FastAPI is an optional integration, not
 a requirement.
 
+[Try it in your browser](playground.md): the real package, running locally in Pyodide.
+
 ## Why this exists
 
 Two ideas drive the whole design.

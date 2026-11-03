@@ -3,9 +3,9 @@ name: docs
 on:
   push:
     branches: [main]
-    paths: ["docs/**", "mkdocs.yml", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "mkdocs.yml", ".github/workflows/docs.yml", "src/**", "pyproject.toml", "scripts/build_playground.py"]
   pull_request:
-    paths: ["docs/**", "mkdocs.yml", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "mkdocs.yml", ".github/workflows/docs.yml", "src/**", "pyproject.toml", "scripts/build_playground.py"]
   workflow_dispatch:
 
 permissions:
@@ -26,6 +26,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r docs/requirements.txt
+      - name: Build the playground wheel
+        run: python scripts/build_playground.py
       - run: mkdocs build --strict
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3.0.1
         if: github.event_name != 'pull_request'

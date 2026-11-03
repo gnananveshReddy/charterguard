@@ -455,7 +455,7 @@ spec = OnnxModelSpec(
     revision="e3b0c44298fc1c149afbf4c8996fb92427ae41e4",   # full commit SHA
     onnx_file=FileSpec("model.onnx", "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"),
     tokenizer_file=FileSpec("tokenizer.json", "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752"),
-    label_map={"BENIGN": Category.OUT_OF_SCOPE, "INJECTION": Category.INJECTION},
+    label_map={"BENIGN": None, "INJECTION": Category.INJECTION},   # None = ignored output
     max_length=256,
     activation="sigmoid",   # sigmoid = multi-label head, softmax = single-label
 )
@@ -494,6 +494,33 @@ Evaluate any model on your own corpus, record which revision you evaluated, and
 re-evaluate when you re-pin. Nor does ONNX eliminate risk entirely: a graph can
 reference custom operators, which is why only `CPUExecutionProvider` is enabled
 and no custom-op libraries are registered.
+
+### Ready-made preset
+
+`charterguard.integrations.onnx_presets` ships one fully pinned spec, so you do not have
+to compute digests to try the tier:
+
+```python
+from charterguard import GuardrailConfig, GuardrailPipeline
+from charterguard.integrations.onnx_presets import injection_scorer
+
+pipeline = GuardrailPipeline(GuardrailConfig.strict(), model=injection_scorer())
+verdict = await pipeline.acheck_input(text)   # the model tier is async-only
+```
+
+| Preset | Model | License | Size | Labels |
+| --- | --- | --- | --- | --- |
+| `protectai-deberta-v3-injection-v2` (default) | [protectai/deberta-v3-base-prompt-injection-v2](https://huggingface.co/protectai/deberta-v3-base-prompt-injection-v2) @ `90c9989b`, ONNX export | Apache-2.0 | ~740 MB | `SAFE` (ignored), `INJECTION` |
+
+The digests were computed from downloaded files and match the hub's LFS object ids.
+Files are cached under `~/.cache/charterguard` (override with `cache_dir=` or
+`CHARTERGUARD_MODEL_CACHE`). For air-gapped hosts, copy the cache directory over and
+pass `allow_download=False`. The model is English-centric and runs about 60 ms per
+input on one CPU core. See [accuracy](accuracy.md#with-the-model-tier) for measured
+numbers.
+
+A `label_map` entry of `None` marks an output the model produces but that should not
+score anything, such as a `SAFE` class. Do not map it to an unrelated category.
 
 ## Choosing, in one pass
 

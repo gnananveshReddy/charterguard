@@ -134,7 +134,10 @@ class OnnxModelSpec:
         onnx_file: the graph, with digest.
         tokenizer_file: a `tokenizers`-compatible ``tokenizer.json``, with digest.
         label_map: model output label (or ``LABEL_0`` style index name) ->
-            guardrail `Category`. Required.
+            guardrail `Category`, in the order of the model's outputs. Required.
+            Map a label to ``None`` to ignore that output (a ``SAFE`` or
+            ``BENIGN`` class): it is still counted, so the head size is
+            checked, but it never scores any category.
         max_length: token truncation. Bounds worst-case latency; a model that
             accepts 512 tokens will happily spend 10x on a 4k-token document.
         activation: ``sigmoid`` for multi-label heads (independent categories),
@@ -147,7 +150,7 @@ class OnnxModelSpec:
     revision: str
     onnx_file: FileSpec
     tokenizer_file: FileSpec
-    label_map: Mapping[str, Category]
+    label_map: Mapping[str, Category | None]
     max_length: int = 256
     activation: str = "sigmoid"
     extra_files: tuple[FileSpec, ...] = field(default_factory=tuple)
@@ -161,7 +164,7 @@ class OnnxModelSpec:
                 f"revision {self.revision!r} is not a full 40-hex commit SHA. "
                 "Branch and tag names re-point without notice; pin the commit."
             )
-        if not self.label_map:
+        if not self.label_map or all(c is None for c in self.label_map.values()):
             raise ModelIntegrityError(
                 "label_map is required: a model's output labels cannot be mapped to "
                 "guardrail categories by inference, and guessing wrong means a "
@@ -278,7 +281,9 @@ def ensure_local(
     must already be present and correct, or this raises.
     """
     root = Path(cache_dir) if cache_dir else Path(
-        os.environ.get("AGENT_GUARDRAILS_MODEL_CACHE", Path.home() / ".cache" / "charterguard")
+        os.environ.get("CHARTERGUARD_MODEL_CACHE")
+        or os.environ.get("AGENT_GUARDRAILS_MODEL_CACHE")  # pre-rename name, still honoured
+        or Path.home() / ".cache" / "charterguard"
     )
     target = root / spec.cache_key()
     for fs in spec.files:
@@ -407,6 +412,8 @@ class OnnxModelScorer:
         self._spec = spec
         self._reverse: dict[Category, list[str]] = {}
         for label, cat in spec.label_map.items():
+            if cat is None:
+                continue  # an ignored output, such as a SAFE class
             self._reverse.setdefault(cat, []).append(label)
 
     async def score(

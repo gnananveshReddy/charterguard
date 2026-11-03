@@ -360,7 +360,8 @@ def guard_tool(
     return StructuredTool(
         name=tool.name,
         description=tool.description,
-        args_schema=tool.args_schema,
+        # Newer langchain-core requires a schema; fall back to the inferred one.
+        args_schema=tool.args_schema if tool.args_schema is not None else tool.get_input_schema(),
         coroutine=_arun,
         # No sync `func`: guarding is async end to end, and a blocking bridge
         # inside a running event loop is a deadlock waiting to happen. Call the
