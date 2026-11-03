@@ -11,3 +11,4 @@ venv/
 .ruff_cache/
 benchmarks/.cache/
 site/
+docs/assets/playground/
