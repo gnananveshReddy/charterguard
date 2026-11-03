@@ -1,0 +1,20 @@
+# Use charterguard from another repository's .pre-commit-config.yaml:
+#
+#   - repo: https://github.com/gnananveshReddy/charterguard
+#     rev: v0.1.0
+#     hooks:
+#       - id: charterguard-prompts
+#         files: ^prompts/
+#
+# Scans committed prompt templates, RAG fixtures or agent instructions as
+# untrusted content and fails the commit when any would be quarantined.
+- id: charterguard-prompts
+  name: charterguard (prompt and fixture files)
+  entry: charterguard scan --layer untrusted --strict
+  language: python
+  types: [text]
+- id: charterguard-secrets
+  name: charterguard (secrets and PII in output fixtures)
+  entry: charterguard scan --layer output --strict
+  language: python
+  types: [text]

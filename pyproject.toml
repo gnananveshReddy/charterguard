@@ -14,6 +14,9 @@ keywords = ["llm", "agents", "guardrails", "prompt-injection", "security"]
 # project without dragging a framework, a model SDK, or a regex engine with it.
 dependencies = []
 
+[project.scripts]
+charterguard = "charterguard.cli:main"
+
 [project.optional-dependencies]
 # Every extra is genuinely optional: the core, the FastAPI-free path, and all
 # stdlib adapters (logging/console/statsd metrics, sqlite ledger + audit, HTTP
