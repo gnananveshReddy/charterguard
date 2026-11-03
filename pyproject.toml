@@ -55,6 +55,9 @@ artifacts = ["src/charterguard/py.typed"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# Set explicitly: pytest-asyncio warns when it is unset, and filterwarnings
+# = error turns that warning into a collection failure.
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = ["error"]
 
 [tool.ruff]
