@@ -2,9 +2,15 @@
 
 ## Reporting a vulnerability
 
-Report suspected vulnerabilities privately to the owning team (internal:
-`#agent-platform-security`; external: the address in `pyproject.toml`). Please do
-not open a public issue for an unpatched detection bypass.
+Report suspected vulnerabilities privately through GitHub's
+[private vulnerability reporting](https://github.com/gnananveshReddy/charterguard/security/advisories/new)
+("Report a vulnerability" on the repository's **Security** tab). Please do not open
+a public issue, discussion or pull request for an unpatched detection bypass,
+redaction failure or scanner DoS.
+
+Ordinary false positives and missed attacks that are *not* a bypass of an existing
+rule (for example a paraphrase no rule claims to cover) are fine as public issues;
+use the "Missed attack" and "False positive" templates.
 
 Include a minimal reproducing input, the version and `POLICY_VERSION`, the
 `Verdict` you received, and the one you expected. A failing test against

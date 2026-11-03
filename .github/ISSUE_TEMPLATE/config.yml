@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a vulnerability or detection bypass (private)
+    url: https://github.com/gnananveshReddy/charterguard/security/advisories/new
+    about: Bypasses of existing rules, redaction failures and scanner DoS must be reported privately.
