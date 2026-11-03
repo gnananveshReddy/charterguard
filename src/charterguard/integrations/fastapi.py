@@ -6,7 +6,8 @@ importing this module is the only thing that requires fastapi.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any, Callable, Sequence
+from typing import Any
+from collections.abc import Callable, Sequence
 
 try:
     from fastapi import Request, status

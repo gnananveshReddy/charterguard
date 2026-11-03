@@ -560,7 +560,7 @@ def test_missing_extra_raises_an_actionable_import_error():
             cls() if name != "OnnxModelScorer" else cls
         except ImportError as exc:
             assert f"charterguard[{extra}]" in str(exc)
-        except Exception:
+        except Exception:  # noqa: S110
             pass  # constructed far enough to need real config; the guard is not the issue
 
 

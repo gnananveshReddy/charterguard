@@ -30,7 +30,8 @@ import asyncio
 import json
 import urllib.error
 import urllib.request
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
+from collections.abc import Callable, Mapping, Sequence
 
 from ..pii import Entity
 from ..types import Category, Layer

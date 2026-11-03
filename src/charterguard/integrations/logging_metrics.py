@@ -25,7 +25,7 @@ import logging
 import socket
 import threading
 import time
-from typing import Mapping
+from collections.abc import Mapping
 
 __all__ = [
     "LoggingMetricsSink",

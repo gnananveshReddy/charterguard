@@ -25,7 +25,7 @@ If GDPR or HIPAA scope applies, treat these as placeholders and install
 from __future__ import annotations
 
 import re
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from ..pii import Entity
 
@@ -35,10 +35,7 @@ _WORD = re.compile(r"[a-z0-9']+")
 # Words too common to carry intent signal. Deliberately short: a long stoplist
 # tuned on one charter stops generalising to the next.
 _STOP = frozenset(
-    "a an the and or but if then for to of in on at by with from as is are was were be been "
-    "do does did can could would should will shall may might must i you he she it we they me "
-    "my your our their this that these those there here what which who whom how why when where "
-    "please help need want about into over under again more most some any no not".split()
+    ["a", "an", "the", "and", "or", "but", "if", "then", "for", "to", "of", "in", "on", "at", "by", "with", "from", "as", "is", "are", "was", "were", "be", "been", "do", "does", "did", "can", "could", "would", "should", "will", "shall", "may", "might", "must", "i", "you", "he", "she", "it", "we", "they", "me", "my", "your", "our", "their", "this", "that", "these", "those", "there", "here", "what", "which", "who", "whom", "how", "why", "when", "where", "please", "help", "need", "want", "about", "into", "over", "under", "again", "more", "most", "some", "any", "no", "not"]
 )
 
 

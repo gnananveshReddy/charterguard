@@ -31,7 +31,8 @@ the output guard, the key they publish safe text to (`safe_output`)::
 """
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Mapping, Sequence, TypedDict
+from typing import Any, TypedDict
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 
 from ..pipeline import GuardrailPipeline
 from ..types import Action, Verdict
@@ -41,7 +42,6 @@ from ._lc_common import (
     message_id,
     message_text,
     replace_message_text,
-    tool_call_id,
     tool_calls,
     tool_message,
     tool_name,

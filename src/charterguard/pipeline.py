@@ -31,7 +31,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, TypeVar
+from collections.abc import Callable, Sequence
 
 from .config import GuardrailConfig
 from .detectors import (
@@ -54,6 +55,8 @@ from .refusals import refusal_for
 from .scanner import ResultCache, content_key
 from .scope import Charter, IntentClassifier, ScopeGate
 from .types import Action, Category, Finding, Layer, Severity, Timer, Verdict
+
+_T = TypeVar("_T")
 
 _DEFAULT_SESSION = "default"
 
@@ -130,7 +133,7 @@ class GuardrailPipeline:
         # Duck-typed on purpose: integrations.audit.AuditSink, or anything with
         # .write(verdict). None means decisions are not persisted, which is a
         # deliberate choice the caller makes rather than a silent default.
-        self._audit = audit_sink
+        self._audit: Any = audit_sink
 
     # ------------------------------------------------------------------ core
     def _scan(self, text: str, layer: Layer) -> tuple[tuple[Finding, ...], bool]:
@@ -211,7 +214,7 @@ class GuardrailPipeline:
         return await self._maybe_escalate(verdict, text, Layer.INPUT)
 
     # ------------------------------------------------------------ async infra
-    async def _offload(self, fn, text: str, **kwargs) -> Verdict:
+    async def _offload(self, fn: Callable[..., _T], text: str, **kwargs: Any) -> _T:
         """Run a sync scan without stalling the event loop on large payloads."""
         if len(text) < self.config.budget.offload_threshold_chars:
             return fn(text, **kwargs)

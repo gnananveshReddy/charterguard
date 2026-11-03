@@ -15,7 +15,8 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Mapping, Protocol
+from typing import Protocol
+from collections.abc import Mapping
 
 from .config import VolumeCeilings
 from .types import Category, Finding, Severity

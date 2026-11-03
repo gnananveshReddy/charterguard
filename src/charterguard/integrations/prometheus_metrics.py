@@ -18,7 +18,8 @@ layer/action/category only, which is bounded and safe.
 """
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 __all__ = ["PrometheusMetricsSink"]
 
@@ -36,7 +37,10 @@ DEFAULT_BUCKETS = (0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0
 class PrometheusMetricsSink:
     """`MetricsSink` writing to a prometheus_client registry."""
 
-    __slots__ = ("_ns", "_registry", "_buckets", "_counters", "_hists", "_gauges", "_labels", "label_mismatches", "_m", "_scale")
+    __slots__ = (
+        "_ns", "_registry", "_buckets", "_counters", "_hists", "_gauges",
+        "_labels", "label_mismatches", "_m", "_scale",
+    )
 
     def __init__(
         self,

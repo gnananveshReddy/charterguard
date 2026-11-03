@@ -27,7 +27,7 @@ TRUST_NONE = "none"
 TRUST_LOW = "low"
 TRUST_INTERNAL = "internal"
 
-_ESCAPE_TOKEN = "[[delimiter-escaped]]"
+_ESCAPE_TOKEN = "[[delimiter-escaped]]"  # noqa: S105 - an escape marker, not a credential
 
 SYSTEM_ENVELOPE_RULES = """\
 UNTRUSTED CONTENT RULES (non-negotiable, apply to every turn):

@@ -8,7 +8,8 @@ behaviour -- what gets blocked, what gets redacted, what the envelope looks like
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any, AsyncIterable, AsyncIterator, Iterable, Mapping, Sequence
+from typing import Any
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Iterable, Mapping, Sequence
 
 from ..exceptions import GuardrailBlocked
 from ..pipeline import GuardrailPipeline
@@ -277,7 +278,7 @@ async def guard_text_stream(
         allowed_citations=allowed_citations,
     )
 
-    async def _iter() -> AsyncIterator[str]:
+    async def _iter() -> AsyncGenerator[str, None]:
         if isinstance(chunks, AsyncIterable):
             async for chunk in chunks:
                 yield _chunk_text(chunk)

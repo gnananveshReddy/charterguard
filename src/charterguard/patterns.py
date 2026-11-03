@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Sequence
+from collections.abc import Sequence
 
 from .types import Category, Layer, Severity
 

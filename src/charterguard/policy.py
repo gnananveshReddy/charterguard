@@ -8,7 +8,7 @@ with rollout phase. Keeping them apart is what makes phased enablement
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from .config import GuardrailConfig
 from .types import Action, Category, Finding, Layer, Mode

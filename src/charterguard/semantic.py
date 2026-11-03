@@ -45,13 +45,19 @@ import re
 from array import array
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Mapping, Protocol, Sequence
+from typing import TYPE_CHECKING, Any, Protocol, cast
+from collections.abc import Mapping, Sequence
 
 from .scanner import ResultCache, content_key
 from .types import Category, Layer
 
+if TYPE_CHECKING:
+    from .detectors.model import ModelScorer
+
 try:  # optional accelerator, never a requirement
-    import numpy as _np
+    import numpy as _np_mod
+
+    _np: Any = _np_mod
 except ImportError:  # pragma: no cover - exercised in dependency-free envs
     _np = None
 
@@ -162,7 +168,7 @@ class PrototypeBank:
         self._top_k = top_k
         self._protos: list[_Prototype] = []
         self._index: dict[int, list[tuple[int, float]]] = defaultdict(list)
-        self._matrix = None            # numpy dense path, built lazily
+        self._matrix: Any = None       # numpy dense path, built lazily
         self._meta: list[tuple[Category, str]] = []
         self._dirty = True
 
@@ -189,7 +195,7 @@ class PrototypeBank:
         """Build the inverted index (and the numpy matrix when available)."""
         self._index = defaultdict(list)
         for pid, proto in enumerate(self._protos):
-            for d, w in zip(proto.dims, proto.weights):
+            for d, w in zip(proto.dims, proto.weights, strict=True):
                 self._index[d].append((pid, w))
         if _np is not None and self._protos:
             matrix = _np.zeros((len(self._protos), self._dim), dtype=_np.float32)
@@ -309,24 +315,24 @@ class SemanticScorer:
         vectors: list[Sequence[float] | None] = []
         for i, key in enumerate(keys):
             cached = self._cache.get(key)
-            vectors.append(cached)  # type: ignore[arg-type]
+            vectors.append(cast("Sequence[float] | None", cached))
             if cached is None:
                 pending.append(i)
         if pending:
             fresh = await self._embedder.aembed([texts[i] for i in pending])
-            for slot, vector in zip(pending, fresh):
+            for slot, vector in zip(pending, fresh, strict=True):
                 vectors[slot] = vector
                 self._cache.put(keys[slot], vector)
 
         wanted = set(categories)
         out: list[dict[Category, float]] = []
-        for vector in vectors:
+        for maybe_vector in vectors:
             # Measured: with numpy present the dense matrix product beats the
             # pure-Python inverted index by ~30x at 30 prototypes and ~29x at
             # 3000, because the index still pays Python loop overhead per
             # non-zero query dimension. The index is the no-numpy fallback, not
             # the fast path.
-            raw = self._bank.score_dense(vector or [])
+            raw = self._bank.score_dense(maybe_vector or [])
             out.append(
                 {
                     category: self._calibrate(sim)
@@ -351,8 +357,8 @@ class CascadingScorer:
 
     def __init__(
         self,
-        fast: object,
-        slow: object,
+        fast: ModelScorer,
+        slow: ModelScorer,
         *,
         promote_low: float = 0.25,
         promote_high: float = 0.80,

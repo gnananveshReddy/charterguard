@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import random
 import time
-import unicodedata
 
 from charterguard import GuardrailPipeline
 from charterguard.normalize import normalize

@@ -55,15 +55,7 @@ _USEFUL_SYMBOLS = frozenset("@$#%&*+=/\\<>{}[]|~^")
 # branch offers a choice of necessary conditions, anything outside this set is
 # preferred. This only affects *which* valid condition is chosen, never whether
 # the condition is sound.
-_COMMON_WORDS = frozenset("""
-about all and answer any are but call can code describe did does end explain
-following for from get give had has have help here how into its just like make
-more most much need new not now one only other our out own plan planning post
-relative respond responses run said same say see send should show some such
-take tell than that the their them then there these they this those told use
-used using very want was way were what when which who why will with without
-work would write you your yourself
-""".split())
+_COMMON_WORDS = frozenset(["about", "all", "and", "answer", "any", "are", "but", "call", "can", "code", "describe", "did", "does", "end", "explain", "following", "for", "from", "get", "give", "had", "has", "have", "help", "here", "how", "into", "its", "just", "like", "make", "more", "most", "much", "need", "new", "not", "now", "one", "only", "other", "our", "out", "own", "plan", "planning", "post", "relative", "respond", "responses", "run", "said", "same", "say", "see", "send", "should", "show", "some", "such", "take", "tell", "than", "that", "the", "their", "them", "then", "there", "these", "they", "this", "those", "told", "use", "used", "using", "very", "want", "was", "way", "were", "what", "when", "which", "who", "why", "will", "with", "without", "work", "would", "write", "you", "your", "yourself"])
 
 # Character classes that terminate a literal run.
 _NON_LITERAL_ESCAPES = frozenset("dDwWsSbBAZzGnrtvf0123456789")
@@ -300,7 +292,7 @@ def _trie_pattern(words: list[str]) -> str:
         node = root
         for ch in w:
             node = node.setdefault(ch, {})  # type: ignore[assignment]
-        node["$"] = True  # type: ignore[index]
+        node["$"] = True
 
     def emit(node: dict[str, object]) -> str:
         alts: list[str] = []

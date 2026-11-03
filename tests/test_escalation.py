@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 
-import pytest
 
 from charterguard import GuardrailPipeline
 from charterguard.config import GuardrailConfig, ModelTier

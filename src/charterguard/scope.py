@@ -14,7 +14,8 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Protocol
+from collections.abc import Sequence
 
 from .config import GuardrailConfig
 from .normalize import normalize

@@ -2,7 +2,6 @@ from charterguard import (
     Category,
     GuardrailConfig,
     GuardrailPipeline,
-    Mode,
 )
 
 STRICT = GuardrailConfig.strict()

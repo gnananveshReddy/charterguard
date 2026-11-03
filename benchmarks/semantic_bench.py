@@ -80,19 +80,22 @@ def load_goals():
     """
     import os
 
-    override = os.environ.get("GUARDRAILS_HARM_CORPUS", "/tmp/jbb_goals.json")
+    import tempfile
+
+    default = Path(tempfile.gettempdir()) / "jbb_goals.json"
+    override = os.environ.get("GUARDRAILS_HARM_CORPUS", str(default))
     path = Path(override)
     if path.is_file():
         text = path.read_text(encoding="utf-8")
         if path.suffix == ".jsonl":
-            goals = [json.loads(l)["text"] for l in text.splitlines() if l.strip()]
+            goals = [json.loads(line)["text"] for line in text.splitlines() if line.strip()]
         else:
             goals = json.loads(text)
         print(f"corpus: {path} ({len(goals)} items)")
         return [(i // 10 if i // 10 < 10 else 9, g) for i, g in enumerate(goals)]
 
     corpus = ROOT / "tests" / "corpus" / "attacks.jsonl"
-    rows = [json.loads(l) for l in corpus.read_text().splitlines() if l.strip()]
+    rows = [json.loads(line) for line in corpus.read_text().splitlines() if line.strip()]
     fams = sorted({r["family"] for r in rows})
     print(f"corpus: bundled {corpus.name} ({len(rows)} items) -- set "
           f"GUARDRAILS_HARM_CORPUS for real data")
@@ -159,17 +162,16 @@ def latency(bank, embedder, heldout):
 
     print(f"{'operation':44}{'p50 (us)':>10}{'p95 (us)':>10}")
     print("-" * 66)
+    qv = embedder.embed_sparse(short)
     for label, fn in (
         ("stage 1: rule scan, short text", lambda: pipeline.check_input(short)),
         ("stage 2a: hash embed, short text", lambda: embedder.embed_sparse(short)),
         ("stage 2a: hash embed, 4KB doc", lambda: embedder.embed_sparse(doc4k)),
         ("stage 2b: prototype match (sparse, 30)", lambda: bank.score_sparse(qv)),
     ):
-        qv = embedder.embed_sparse(short)
         p50, p95 = timed(fn, 200)
         print(f"{label:44}{p50:10.1f}{p95:10.1f}")
 
-    qv = embedder.embed_sparse(short)
     dense = [0.0] * embedder.dim
     for d, v in qv.items():
         dense[d] = v
@@ -179,8 +181,8 @@ def latency(bank, embedder, heldout):
         for i in range(size):
             big.add_sparse(Category.HARMFUL, f"p{i}", embedder.embed_sparse(heldout[i % len(heldout)][1]))
         big.finalize()
-        p50s, _ = timed(lambda: big.score_sparse(qv), 100)
-        p50d, _ = timed(lambda: big.score_dense(dense), 100)
+        p50s, _ = timed(lambda big=big: big.score_sparse(qv), 100)
+        p50d, _ = timed(lambda big=big: big.score_dense(dense), 100)
         print(f"{'stage 2b: match ' + str(size) + ' prototypes (sparse)':44}{p50s:10.1f}")
         print(f"{'stage 2b: match ' + str(size) + ' prototypes (numpy)':44}{p50d:10.1f}"
               f"   {'faster' if p50d < p50s else 'slower'} than sparse")
