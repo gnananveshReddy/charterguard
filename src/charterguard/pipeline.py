@@ -62,7 +62,8 @@ from .normalize import NormalizedText, normalize
 from .policy import decide, dedupe
 from .redact import RedactionResult, redact
 from .refusals import refusal_for
-from .patterns import rules_for
+from .patterns import RULES, Rule, rules_for
+from .rulepack import RulePack, combine_rules
 from .scanner import CompiledRuleSet, ResultCache, compile_rules, content_key
 from .scope import Charter, IntentClassifier, ScopeGate
 from .types import Action, Category, Finding, Layer, Mode, Severity, Timer, Verdict
@@ -111,6 +112,7 @@ class GuardrailPipeline:
         "_metrics",
         "_audit",
         "_all_input_rules",
+        "_rules",
         "_complete_cfg",
         "_must_complete",
     )
@@ -129,6 +131,7 @@ class GuardrailPipeline:
         system_prefix: str | None = None,
         metrics: MetricsSink | None = None,
         audit_sink: object | None = None,
+        rule_packs: Sequence[RulePack] = (),
     ) -> None:
         self.config = config or GuardrailConfig()
         self.scope_gate = (
@@ -138,11 +141,19 @@ class GuardrailPipeline:
         self.ledger = ledger or SessionLedger()
         self.grounding = grounding or GroundingChecker()
         self.prefix_guard = SystemPrefixGuard(system_prefix) if system_prefix else None
+        if rule_packs and detectors is not None:
+            raise ValueError(
+                "rule_packs adds rules to the default RuleDetector; with custom detectors, "
+                "pass RuleDetector(rules=combine_rules(packs)) yourself"
+            )
+        self._rules: tuple[Rule, ...] = combine_rules(rule_packs) if rule_packs else RULES
         self._detectors: tuple[Detector, ...] = tuple(detectors) if detectors is not None else (
-            RuleDetector(),
+            # Pack rules run everywhere built-in rules do: on the text, on
+            # decoded payloads and on de-obfuscated views.
+            RuleDetector(rules=self._rules),
             StructuralDetector(),
-            EncodedPayloadDetector(),
-            ObfuscationDetector(),
+            EncodedPayloadDetector(rules=self._rules),
+            ObfuscationDetector(rules=self._rules),
         )
         self._model = ModelDetector(model) if model is not None else None
         self._cache = ResultCache(self.config.budget.cache_size)
@@ -247,7 +258,7 @@ class GuardrailPipeline:
         budget = self.config.budget
         nt_quote = normalize(keep_only_spans(text, [(s, e)]), max_chars=budget.max_chars)
         if self._all_input_rules is None:
-            self._all_input_rules = compile_rules(rules_for(layer=Layer.INPUT))
+            self._all_input_rules = compile_rules(rules_for(layer=Layer.INPUT, rules=self._rules))
         matches = self._all_input_rules.scan(nt_quote.text, limit=64)
         detected = [f for d in self._detectors for f in d.scan(nt_quote, layer, self.config)]
         if any(m.rule.category not in _DAMPENABLE for m in matches) or any(

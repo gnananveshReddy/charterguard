@@ -18,12 +18,13 @@ from __future__ import annotations
 import base64
 import binascii
 import re
+from collections.abc import Sequence
 from urllib.parse import unquote
 
 from ..config import GuardrailConfig, ScanBudget
 from ..normalize import NormalizedText, normalize
-from ..patterns import rules_for
-from ..scanner import compile_rules
+from ..patterns import RULES, Rule
+from .base import RuleDetector, layered_rulesets
 from ..types import Category, Finding, Layer, Severity
 from ..validators import is_encoded_run
 
@@ -85,12 +86,12 @@ def _try_pct(chunk: str) -> str | None:
 class EncodedPayloadDetector:
     name = "encoded"
 
-    __slots__ = ("_ruleset",)
+    __slots__ = ("_by_layer",)
 
-    def __init__(self) -> None:
-        self._ruleset = compile_rules(
-            rules_for(layer=Layer.UNTRUSTED, categories=_DECODED_CATEGORIES)
-        )
+    def __init__(self, *, rules: Sequence[Rule] = RULES) -> None:
+        # ``rules``: the full rule set in force (built-in plus any rule packs),
+        # so a pack rule is not bypassed by base64-encoding its trigger.
+        self._by_layer = layered_rulesets(rules, _DECODED_CATEGORIES)
 
     def scan(self, nt: NormalizedText, layer: Layer, config: GuardrailConfig) -> list[Finding]:
         if not config.enable_encoded_scan:
@@ -108,9 +109,12 @@ class EncodedPayloadDetector:
                 source[: budget.max_chars - budget.tail_chars] + source[-budget.tail_chars :]
             )
 
+        ruleset = self._by_layer.get(layer)
+        if ruleset is None:
+            return []
         for depth, decoded, start, end in self._walk(source, budget.decode_depth, budget, seen):
             inner = normalize(decoded, max_chars=budget.max_decoded_chars)
-            for m in self._ruleset.scan(inner.text, limit=4):
+            for m in ruleset.scan(inner.text, limit=4, keep=RuleDetector._keep):
                 findings.append(
                     Finding(
                         rule_id=m.rule.id,

@@ -53,10 +53,9 @@ from typing import Protocol
 
 from ..config import GuardrailConfig
 from ..normalize import NormalizedText, normalize
-from ..patterns import rules_for
-from ..scanner import compile_rules
+from ..patterns import RULES, Rule
 from ..types import Category, Finding, Layer, Severity
-from .base import severity_score
+from .base import RuleDetector, layered_rulesets, severity_score
 
 __all__ = ["ObfuscationDetector", "DeobfuscatedView", "deobfuscate"]
 
@@ -354,13 +353,15 @@ def _overlaps(changed: tuple[int, ...], start: int, end: int) -> bool:
 class ObfuscationDetector:
     name = "obfuscation"
 
-    __slots__ = ("_ruleset",)
+    __slots__ = ("_by_layer",)
 
-    def __init__(self) -> None:
-        self._ruleset = compile_rules(rules_for(layer=Layer.UNTRUSTED, categories=_CATEGORIES))
+    def __init__(self, *, rules: Sequence[Rule] = RULES) -> None:
+        # ``rules``: the full rule set in force (built-in plus any rule packs).
+        self._by_layer = layered_rulesets(rules, _CATEGORIES)
 
     def scan(self, nt: NormalizedText, layer: Layer, config: GuardrailConfig) -> list[Finding]:
-        if not config.enable_obfuscation_scan or not nt.text:
+        ruleset = self._by_layer.get(layer)
+        if not config.enable_obfuscation_scan or not nt.text or ruleset is None:
             return []
         # The normalized text already applies the head+tail sampling budget
         # for oversized inputs, so there is nothing to re-sample here. The
@@ -378,7 +379,7 @@ class ObfuscationDetector:
                 continue
             for lo, hi in _windows(view.changed, len(view.text)):
                 inner = normalize(view.text[lo:hi], max_chars=len(view.text) + 1)
-                for m in self._ruleset.scan(inner.text, limit=4):
+                for m in ruleset.scan(inner.text, limit=4, keep=RuleDetector._keep):
                     vs, ve = inner.span(m.start, m.end)
                     vs, ve = lo + vs, lo + ve
                     if m.rule.id in reported or not _overlaps(view.changed, vs, ve):

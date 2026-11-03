@@ -63,6 +63,21 @@ Rules live in `src/charterguard/patterns.py`. Every rule change needs:
 Run `python benchmarks/accuracy.py` before and after a rule change, and include
 both tables in the PR. A precision drop on the public sets needs a justification.
 
+## Contributing a rule pack
+
+Rules for one domain (a product, an industry, a regulation) belong in a pack,
+not in the core rule set. To propose a bundled pack:
+
+1. Add `src/charterguard/rulepacks/<name>.toml` (see the README's "Rule packs"
+   section for the format, and `agent-tools.toml` as a worked example).
+2. Give every rule at least two `examples` and at least one `counterexample`
+   that a careless pattern would match. The examples are executed every time the
+   pack loads.
+3. Run `charterguard pack check <name>` and the test suite. `tests/test_rulepack.py`
+   loads every bundled pack.
+4. Scope `layers` tightly. Most agent-facing rules belong on `untrusted` and
+   `tool_output` only, so users can still ask about the topic.
+
 ## Non-English rules
 
 Native speakers are especially welcome. Indian-language vocabulary lives in

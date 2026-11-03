@@ -12,6 +12,13 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Rule packs: TOML rule files loaded with `load_rule_pack()` or `bundled_rule_pack()`
+  and passed as `GuardrailPipeline(rule_packs=[...])`. Every rule's examples and
+  counterexamples run through the real scanner at load time; patterns that could
+  backtrack catastrophically or outgrow the prefilter window are rejected; ids are
+  namespaced. CLI: `charterguard pack list | check`, `--pack` on scan/eval/rules/mcp.
+  Bundled pack `agent-tools` (force-push, credential files, env dumps, cloud metadata,
+  package publishing, skipping hooks and branch protection).
 - Detection vocabulary: overrides of "orders / tasks / commands / directives",
   "forget everything, <directive>", "ignore all instructions", "ignore the above,",
   clearing earlier context ("leave all previous information behind"), replacement
@@ -97,6 +104,10 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 - `jb.unrestricted` also covers "an AI without any guidelines".
 
 ### Fixed
+- The normalizer could emit two whitespace characters in a row (a Unicode space
+  followed by an ASCII one, or spaces around a stripped invisible character), so a
+  rule with a single `\s` or literal space could be bypassed with mixed whitespace.
+  The output now never contains a whitespace run.
 - Redaction merged partially overlapping findings by dropping the later one,
   leaving its tail in the clear (a phone match on the head of a run, a card on
   the rest). Overlaps are now redacted as their union.
