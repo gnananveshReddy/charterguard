@@ -35,6 +35,14 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 - Benign corpus grown from 16 to 53 texts, including security discussion and
   instruction-heavy everyday requests; attack corpus to 43.
 
+- Native-script override rules for Hindi, Telugu, Tamil, Bengali, Marathi,
+  Kannada, Malayalam, Gujarati, Punjabi and Urdu, plus romanized Hinglish
+  (`inj.ml.<lang>.override`, HIGH), and system-prompt leak rules for Hindi
+  and Hinglish (`inj.ml.<lang>.leak`). Each requires an "earlier/all" word,
+  an "instructions/rules" word and an "ignore/forget" verb, in either order,
+  so "follow all previous instructions" stays allowed. Malayalam accepts both
+  atomic chillu letters and the virama+ZWJ spelling.
+
 ### Changed
 - False positives removed (all blocked in strict mode before):
   - `inj.prompt.leak`: generic nouns need "your" -- "print the configuration
@@ -48,6 +56,13 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
     (HIGH) to `inj.roleplay` (MEDIUM): it flags, and only blocks combined
     with another finding.
 - `jb.unrestricted` also covers "an AI without any guidelines".
+
+### Fixed
+- Prefilter soundness: `required_literals` read lookbehinds `(?<!` / `(?<=`
+  as the literal text `?<!`. When a rule's real literals were short, the bogus
+  literal won and the rule could never fire with the prefilter on, while
+  `prefilter=False` matched. Every `(?...)` form is now parsed explicitly;
+  unknown ones (`(?P=`, conditionals) fall back to a full scan.
 
 ### Security
 - HTTP adapters (`HttpModelScorer`, `OpenAIModerationScorer`,
