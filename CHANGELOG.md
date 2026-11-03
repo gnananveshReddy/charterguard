@@ -12,6 +12,9 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- OpenAI Agents SDK guardrails (input, output, tool input, tool output; input runs
+  blocking) and Claude Agent SDK hooks (UserPromptSubmit, PreToolUse, PostToolUse,
+  per-session ceilings). Extras `openai-agents`, `claude-agent-sdk`; both run in CI.
 - MCP: `charterguard mcp` stdio server (`scan_text`, `redact_text`, `list_rules`;
   protocol 2024-11-05 through 2025-11-25; stdlib only) and `guard_mcp_result()`
   to treat other MCP servers' tool results as untrusted input.

@@ -402,8 +402,17 @@ def test_tool_argument_guard_refuses_before_any_side_effect_runs():
 
 def test_langgraph_adapter_imports_no_third_party_module():
     """The nodes are plain callables; the framework name is not a dependency."""
-    for mod in ("langgraph", "langchain_core", "pydantic"):
-        assert mod not in sys.modules, f"{mod} was imported by the guardrail adapters"
+    import os
+    import subprocess
+
+    mods = ("langgraph", "langchain_core", "pydantic")
+    code = (
+        "import sys, charterguard.integrations.langgraph; "
+        f"print(','.join(m for m in {mods!r} if m in sys.modules))"
+    )
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)}
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, check=True)  # noqa: S603
+    assert out.stdout.strip() == "", f"imported by the guardrail adapters: {out.stdout.strip()}"
 
 
 def test_langchain_adapter_names_its_extra_when_the_package_is_absent():

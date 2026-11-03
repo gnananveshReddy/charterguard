@@ -40,6 +40,9 @@ presidio = ["presidio-analyzer>=2.2", "spacy>=3.7"]
 # and no weights are bundled. Weights are fetched by pinned commit SHA and
 # verified by SHA-256 at load. See SECURITY.md.
 onnx = ["onnxruntime>=1.17", "tokenizers>=0.15"]
+# Agent SDK adapters. Minimums are the versions the adapters were verified against.
+openai-agents = ["openai-agents>=0.24"]
+claude-agent-sdk = ["claude-agent-sdk>=0.2.176"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.6", "mypy>=1.10", "pre-commit>=3.7"]
 
 [tool.hatch.build.targets.wheel]

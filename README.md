@@ -318,6 +318,39 @@ charterguard rules --category pii
 * `.pre-commit-hooks.yaml` exposes `charterguard-prompts` and `charterguard-secrets`
   for use from other repositories.
 
+## Agent SDKs
+
+**OpenAI Agents SDK** (`pip install "charterguard[openai-agents]"`):
+
+```python
+from charterguard.integrations.openai_agents import (
+    input_guardrail, output_guardrail, tool_input_guardrail, tool_output_guardrail,
+)
+
+agent = Agent(name="support",
+              input_guardrails=[input_guardrail(pipeline)],
+              output_guardrails=[output_guardrail(pipeline)])
+```
+
+The input guardrail runs blocking (`run_in_parallel=False`), so the agent does not
+start acting on a turn that is about to be blocked. The tool output guardrail replaces
+quarantined or redacted tool output with the enveloped text.
+
+**Claude Agent SDK** (`pip install "charterguard[claude-agent-sdk]"`):
+
+```python
+from charterguard.integrations import claude_agent_hooks
+
+options = ClaudeAgentOptions(hooks=claude_agent_hooks(pipeline))
+```
+
+`UserPromptSubmit` blocks attacks before the model sees them, `PreToolUse` denies
+forbidden or command-injecting tool calls, and `PostToolUse` replaces quarantined
+output, or output carrying secrets or PII, with a same-shape redacted or withheld copy
+(`updatedToolOutput`). The SDK keeps the original output if a replacement doesn't
+match the tool's schema, so for tools you control, guarding inside the tool (or
+serving it through `charterguard mcp`) is still the strongest option.
+
 ## MCP
 
 `charterguard mcp` runs an [MCP](https://modelcontextprotocol.io) server over stdio

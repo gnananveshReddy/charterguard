@@ -597,11 +597,21 @@ def test_ensure_local_deletes_and_refuses_a_corrupted_cache_entry(tmp_path=None)
 def test_integrations_import_pulls_in_no_optional_dependency():
     """The core promise: `pip install charterguard` stays dependency-free,
     and merely importing the integrations package does not change that."""
-    import importlib
+    import os
+    import subprocess
 
-    importlib.import_module("charterguard.integrations")
-    for optional in ("redis", "prometheus_client", "opentelemetry", "spacy", "onnxruntime", "fastapi"):
-        assert optional not in sys.modules, f"{optional} was imported eagerly"
+    # A fresh interpreter: other tests may legitimately import these
+    # packages, so checking this process's sys.modules would be order-dependent.
+    optional = ("redis", "prometheus_client", "opentelemetry", "spacy", "onnxruntime", "fastapi",
+                "agents", "claude_agent_sdk", "pydantic")
+    code = (
+        "import sys, charterguard.integrations; "
+        "import charterguard.integrations.openai_agents, charterguard.integrations.claude_agent_sdk; "
+        f"print(','.join(m for m in {optional!r} if m in sys.modules))"
+    )
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)}
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, check=True)  # noqa: S603
+    assert out.stdout.strip() == "", f"imported eagerly: {out.stdout.strip()}"
 
 
 def test_missing_extra_raises_an_actionable_import_error():
