@@ -204,6 +204,14 @@ class _Builder:
         self.confusable = 0
 
     def add_slice(self, chunk: str, src_start: int) -> None:
+        # Invariant: the output never holds two whitespace characters in a
+        # row. ASCII slices keep single whitespace characters verbatim, so a
+        # slice that starts with one right after a space (a Unicode space, or
+        # a space before a stripped invisible character) must drop it. Rules
+        # rely on this: `\s` alone must match every word gap.
+        while chunk and self.last_space and chunk[0].isspace():
+            chunk = chunk[1:]
+            src_start += 1
         if not chunk:
             return
         # Only record a breakpoint when the mapping actually shifts.

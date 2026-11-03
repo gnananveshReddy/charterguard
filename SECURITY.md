@@ -65,6 +65,14 @@ Each of these is a deliberate, documented boundary rather than an oversight.
 3. **Free-text PII needs NER.** Structured PII (email, card, national IDs) is
    covered by checksum-gated rules. A name or health fact in prose is not. Wire
    a recognizer through `charterguard.pii.EntityRecognizer`.
+   Decoy groups: when a digit run fails its checksum, IBAN and GSTIN
+   candidates are re-examined from each token inside it, and a card is
+   searched for as one group-aligned span with a real issuer prefix and
+   length (`4111 4111 1111 1111 1111` is caught). Aadhaar and phone numbers
+   glued to a decoy group are not split out: their checks pass too many
+   random windows. A card hidden in an *unbroken* digit run with no group
+   separators is not split out either. Redaction is a leak-reduction control,
+   not a guarantee against an adversary who controls the output format.
 4. **Multilingual coverage is seed-level.** The bundled pack covers common
    override phrasings in about a dozen languages. Full multilingual detection
    requires a multilingual classifier.

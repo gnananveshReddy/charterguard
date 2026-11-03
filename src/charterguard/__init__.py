@@ -32,6 +32,7 @@ from .config import (
     VolumeCeilings,
 )
 from .policy_file import PolicyError, load_policy
+from .rulepack import RulePack, RulePackError, bundled_rule_pack, bundled_rule_packs, load_rule_pack
 from .detectors import (
     Detector,
     EncodedPayloadDetector,
@@ -87,6 +88,12 @@ __all__ = [
     "VolumeCeilings",
     "load_policy",
     "PolicyError",
+    # rule packs
+    "RulePack",
+    "RulePackError",
+    "load_rule_pack",
+    "bundled_rule_pack",
+    "bundled_rule_packs",
     # types
     "Action",
     "Category",

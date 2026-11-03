@@ -9,6 +9,9 @@ are only meaningful to a reader:
 * letter spacing (``i g n o r e``, ``i.g.n.o.r.e``) -- collapsing single
   letters in the shared pass would corrupt initials, list markers and code;
 * hyphenated line breaks (``prev-\\nious``);
+* quote / emphasis marks wrapping a single word inside a phrase
+  (``your "system" prompt``, ``all **previous** instructions``) -- stripping
+  quotes in the shared pass would merge string literals in code and JSON;
 * rot13, which is a cipher rather than an encoding, so the encoded-payload
   detector's printable-ratio gate cannot tell it from prose.
 
@@ -21,7 +24,8 @@ de-obfuscated view with a per-character map back to the original, re-scans
 only windows around the characters it changed with the instruction-shaped
 rule categories, and reports a match only if it overlaps a change. The
 concealment is itself the signal, so severity is raised the same way the
-encoded detector raises it.
+encoded detector raises it -- except for quote wrapping, which is ordinary
+emphasis and keeps the rule's own severity.
 
 Word gaps survive normalization even though whitespace runs are collapsed:
 the detector looks at the *original* characters behind each normalized space
@@ -49,9 +53,9 @@ from typing import Protocol
 
 from ..config import GuardrailConfig
 from ..normalize import NormalizedText, normalize
-from ..patterns import rules_for
-from ..scanner import compile_rules
+from ..patterns import RULES, Rule
 from ..types import Category, Finding, Layer, Severity
+from .base import RuleDetector, layered_rulesets, severity_score
 
 __all__ = ["ObfuscationDetector", "DeobfuscatedView", "deobfuscate"]
 
@@ -105,6 +109,44 @@ _ROT13_WORDS = re.compile(r"\b(?:gur|naq|lbh|vtaber|cerivbhf|vafgehpgvbaf|flfgrz
 # view exists to make.
 _LEET_TOKEN = re.compile(r"[a-z0-9@$]{3,}")
 _LEET_MAP = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"})
+
+
+# Quote / emphasis marks wrapping a single word inside a phrase:
+# 'your "system" prompt', 'ignore all **previous** instructions'. Only a mark
+# with a word on BOTH sides of the gap counts (word, space, mark, word -- or
+# the mirror), so a phrase quoted as a whole and JSON keys open nothing. An
+# apostrophe inside a word ("don't") has letters on both sides and no space,
+# so it is never touched.
+_QUOTES = "quote-wrapping"
+_WRAP_CHARS = "\"'`*_~“”‘’«»"
+_WRAP_OPEN = re.compile(r"(?<=[^\W_] )[" + re.escape(_WRAP_CHARS) + r"]+(?=[^\W_])")
+_WRAP_CLOSE = re.compile(r"(?<=[^\W_])[" + re.escape(_WRAP_CHARS) + r"]+(?= [^\W_])")
+
+
+def _unwrap(text: str, src: Sequence[int]) -> tuple[str, list[int], list[int]] | None:
+    """Drop word-wrapping quote marks. ``changed`` holds the space at each join,
+    so a rule match counts only when it spans the gap the quotes sat in."""
+    cuts: list[tuple[int, int, bool]] = [(m.start(), m.end(), True) for m in _WRAP_OPEN.finditer(text)]
+    cuts += [(m.start(), m.end(), False) for m in _WRAP_CLOSE.finditer(text)]
+    if not cuts:
+        return None
+    cuts.sort()
+    out: list[str] = []
+    out_src: list[int] = []
+    changed: list[int] = []
+    pos = length = 0
+    for s, e, opening in cuts:
+        if s < pos:  # a run both closes one word and opens the next
+            continue
+        out.append(text[pos:s])
+        out_src.extend(src[pos:s])
+        length += s - pos
+        # Opening mark: the space before it. Closing mark: the space after it.
+        changed.append(length - 1 if opening else length)
+        pos = e
+    out.append(text[pos:])
+    out_src.extend(src[pos:])
+    return "".join(out), out_src, changed
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,9 +257,25 @@ def deobfuscate(
     spaced = _SPACED_SHAPE in shape
     leet = any(s in shape for s in _LEET_SHAPES)
     rot13 = any(marker in text for marker in _ROT13_MARKERS)
-    if not (hyphen or spaced or leet or rot13):
+    wrapped = any(c in text for c in _WRAP_CHARS)
+    if not (hyphen or spaced or leet or rot13 or wrapped):
         return
     base = list(source) if source is not None else list(range(len(text)))
+    yield from _concealment_views(text, base, original, hyphen=hyphen, spaced=spaced, leet=leet, rot13=rot13)
+    # Last, so a concealment view always claims a rule first: its finding is
+    # the raised one, and must not be shadowed by the plain quote-view finding.
+    if wrapped:
+        unwrapped = _unwrap(text, base)
+        if unwrapped is not None:
+            u_text, u_src, u_changed = unwrapped
+            yield DeobfuscatedView(_QUOTES, u_text, tuple(u_src), tuple(u_changed))
+
+
+def _concealment_views(
+    text: str, base: list[int], original: str | None, *, hyphen: bool, spaced: bool, leet: bool, rot13: bool
+) -> Iterator[DeobfuscatedView]:
+    if not (hyphen or spaced or leet or rot13):
+        return
     orig = text if original is None else original
 
     techniques: list[str] = []
@@ -295,13 +353,15 @@ def _overlaps(changed: tuple[int, ...], start: int, end: int) -> bool:
 class ObfuscationDetector:
     name = "obfuscation"
 
-    __slots__ = ("_ruleset",)
+    __slots__ = ("_by_layer",)
 
-    def __init__(self) -> None:
-        self._ruleset = compile_rules(rules_for(layer=Layer.UNTRUSTED, categories=_CATEGORIES))
+    def __init__(self, *, rules: Sequence[Rule] = RULES) -> None:
+        # ``rules``: the full rule set in force (built-in plus any rule packs).
+        self._by_layer = layered_rulesets(rules, _CATEGORIES)
 
     def scan(self, nt: NormalizedText, layer: Layer, config: GuardrailConfig) -> list[Finding]:
-        if not config.enable_obfuscation_scan or not nt.text:
+        ruleset = self._by_layer.get(layer)
+        if not config.enable_obfuscation_scan or not nt.text or ruleset is None:
             return []
         # The normalized text already applies the head+tail sampling budget
         # for oversized inputs, so there is nothing to re-sample here. The
@@ -309,25 +369,37 @@ class ObfuscationDetector:
         views = deobfuscate(nt.text, _LazySourceMap(nt), nt.original)
         findings: list[Finding] = []
         reported: set[str] = set()
+        # Separate budgets: quote-wrapping hits (common, plain severity) must
+        # not use up the slots a raised concealment finding needs.
+        budget = {True: _MAX_FINDINGS, False: _MAX_FINDINGS}
         source = nt.original
         for view in views:
+            quotes = view.technique == _QUOTES
+            if budget[quotes] <= 0:
+                continue
             for lo, hi in _windows(view.changed, len(view.text)):
                 inner = normalize(view.text[lo:hi], max_chars=len(view.text) + 1)
-                for m in self._ruleset.scan(inner.text, limit=4):
+                for m in ruleset.scan(inner.text, limit=4, keep=RuleDetector._keep):
                     vs, ve = inner.span(m.start, m.end)
                     vs, ve = lo + vs, lo + ve
                     if m.rule.id in reported or not _overlaps(view.changed, vs, ve):
                         continue
                     start = view.source[vs]
                     end = view.source[ve - 1] + 1
+                    # Quoting a word is ordinary emphasis, not concealment:
+                    # it gets the rule's own severity, not the raised one.
+                    if view.technique == _QUOTES:
+                        severity = m.rule.severity
+                        score = severity_score(severity)
+                    else:
+                        severity = Severity.CRITICAL if m.rule.severity >= Severity.HIGH else Severity.HIGH
+                        score = 0.85
                     findings.append(
                         Finding(
                             rule_id=m.rule.id,
                             category=m.rule.category,
-                            severity=Severity.CRITICAL
-                            if m.rule.severity >= Severity.HIGH
-                            else Severity.HIGH,
-                            score=0.85,
+                            severity=severity,
+                            score=score,
                             detector=self.name,
                             start=start,
                             end=end,
@@ -337,8 +409,11 @@ class ObfuscationDetector:
                         )
                     )
                     reported.add(m.rule.id)
-                    if len(findings) >= _MAX_FINDINGS:
-                        return findings
+                    budget[quotes] -= 1
+                    if budget[quotes] <= 0:
+                        break
+                if budget[quotes] <= 0:
+                    break
         return findings
 
 

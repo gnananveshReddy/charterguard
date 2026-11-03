@@ -12,6 +12,23 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Rule packs: TOML rule files loaded with `load_rule_pack()` or `bundled_rule_pack()`
+  and passed as `GuardrailPipeline(rule_packs=[...])`. Every rule's examples and
+  counterexamples run through the real scanner at load time; patterns that could
+  backtrack catastrophically or outgrow the prefilter window are rejected; ids are
+  namespaced. CLI: `charterguard pack list | check`, `--pack` on scan/eval/rules/mcp.
+  Bundled pack `agent-tools` (force-push, credential files, env dumps, cloud metadata,
+  package publishing, skipping hooks and branch protection).
+- Detection vocabulary: overrides of "orders / tasks / commands / directives",
+  "forget everything, <directive>", "ignore all instructions", "ignore the above,",
+  clearing earlier context ("leave all previous information behind"), replacement
+  announcements ("your instructions are now", "new instructions follow") and
+  "what was written at the beginning of this prompt". Structural German and French
+  override rules (verb + qualifier + noun, both word orders for German). Mined from
+  the deepset train split; held-out test recall 0.05 -> 0.20, precision 1.00.
+- Obfuscation detector: a quote-wrapping view, so `your "system" prompt` or
+  `all **previous** instructions` match like the unquoted phrase. A phrase quoted
+  as a whole, JSON keys and apostrophes are not affected.
 - Project hygiene: CONTRIBUTING, CODE_OF_CONDUCT (Contributor Covenant 2.1),
   issue templates for missed attacks / false positives / bugs / features, a PR
   template, Dependabot, CodeQL, OpenSSF Scorecard, and a release workflow with
@@ -87,6 +104,21 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 - `jb.unrestricted` also covers "an AI without any guidelines".
 
 ### Fixed
+- The normalizer could emit two whitespace characters in a row (a Unicode space
+  followed by an ASCII one, or spaces around a stripped invisible character), so a
+  rule with a single `\s` or literal space could be bypassed with mixed whitespace.
+  The output now never contains a whitespace run.
+- Redaction merged partially overlapping findings by dropping the later one,
+  leaving its tail in the clear (a phone match on the head of a run, a card on
+  the rest). Overlaps are now redacted as their union.
+- A decoy group before or after a card number (`4111 4111 1111 1111 1111`)
+  hid it: the run failed Luhn as a whole and was skipped. A rejected run is
+  now searched for one group-aligned span with a real issuer prefix and length.
+  IBAN and GSTIN candidates are re-examined from each token inside a rejected run.
+- `pii.iban` matched any token shaped like two letters, two digits and alphanumerics, so
+  hex digests, git SHAs and random ids (`ab12f9e8c7d6b5a4`) were redacted as IBANs. It now
+  requires an ISO 13616 country code, that country's length and a valid mod-97 checksum,
+  and also matches IBANs printed in groups of four.
 - Prefilter soundness: `required_literals` read lookbehinds `(?<!` / `(?<=`
   as the literal text `?<!`. When a rule's real literals were short, the bogus
   literal won and the rule could never fire with the prefilter on, while

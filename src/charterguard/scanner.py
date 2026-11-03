@@ -49,10 +49,18 @@ from collections.abc import Callable, Sequence
 
 from .patterns import Rule
 from .prefilter import LiteralIndex, required_literals, split_alternation, windows
+from .validators import card_subspan
 from .types import Severity
 
 _FLAGS = re.DOTALL  # text arrives casefolded from the normalizer
 _WHOLE_TEXT = None  # sentinel: scan the entire string
+# A word character that follows a non-word character (or the text start).
+_TOKEN_START = re.compile(r"(?<!\w)\w")
+# Validators strong enough that a rejected candidate is re-examined from each
+# token start inside it (see the scan loop).
+_RESCAN_INSIDE = frozenset({"iban", "gstin"})
+# A run of digits joined by single spaces or hyphens, bounded so one call stays cheap.
+_DIGIT_RUN = re.compile(r"\d(?:[ \-]?\d){0,63}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,10 +260,42 @@ class CompiledRuleSet:
                     start, end = m.start(), m.end()
                     matched = m.group(0)
                     if keep is not None and not keep(rule, matched):
-                        # Advance past the whole candidate rather than sliding one
-                        # character in: sliding inside a numeric run manufactures
-                        # false positives, because some 12-to-15-digit window of an
-                        # arbitrary long number will satisfy Luhn by chance.
+                        # Where to resume is a trade-off per validator:
+                        # * Weak checksums (Luhn, Verhoeff, phone shape) pass
+                        #   ~10% of random windows, so retrying inside a long
+                        #   or grouped number ("1234 5678 9012 3456")
+                        #   manufactures false positives: skip it whole.
+                        # * Strong checks (IBAN: country + exact length +
+                        #   mod-97; GSTIN) almost never pass by chance, and
+                        #   skipping whole would let a decoy prefix hide a
+                        #   real value ("be00 be68 5390 ..."): resume at the
+                        #   next token start inside the rejected span.
+                        # * Cards sit in between: a decoy group must not hide a
+                        #   card, so a rejected run is searched for one
+                        #   group-aligned span with a real issuer prefix and
+                        #   length (validators.card_subspan) before skipping.
+                        if rule.validate in _RESCAN_INSIDE:
+                            nxt = _TOKEN_START.search(text, start + 1, end)
+                            if nxt is not None:
+                                pos = nxt.start()
+                                continue
+                        elif rule.validate == "luhn":
+                            # The regex may stop short of the run (19-digit cap
+                            # plus backtracking), so search the whole grouped run.
+                            run = _DIGIT_RUN.match(text, start)
+                            run_end = run.end() if run is not None else end
+                            sub = card_subspan(text[start:run_end])
+                            if sub is not None:
+                                s, e = start + sub[0], start + sub[1]
+                                end = max(end, e)
+                                key = (rule.id, s, e)
+                                if key not in seen:
+                                    seen.add(key)
+                                    out.append(RawMatch(rule, s, e, text[s:e]))
+                                    if len(out) >= limit:
+                                        return out
+                                    if stop_at is not None and rule.severity >= stop_at:
+                                        return out
                         pos = end if end > start else start + 1
                         continue
                     key = (rule.id, start, end)
