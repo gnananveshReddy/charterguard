@@ -1,0 +1,45 @@
+site_name: charterguard
+site_description: Deterministic guardrails for LLM agent harnesses
+repo_url: https://github.com/gnananveshReddy/charterguard
+repo_name: gnananveshReddy/charterguard
+edit_uri: edit/main/docs/
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/brightness-7, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/brightness-4, name: Light mode}
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: {permalink: true}
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Overview: index.md
+  - Guides:
+      - Integrations: integrations.md
+      - Untrusted content: untrusted-content.md
+      - Policy files: policy.md
+      - Rule packs: rule-packs.md
+      - Command line: cli.md
+      - Operating it: operations.md
+  - Reference:
+      - Adapters: adapters.md
+      - Extending it: extending.md
+      - Detection accuracy: accuracy.md
+      - How it compares: comparison.md
+      - Security assumptions: security.md
+  - Development: development.md

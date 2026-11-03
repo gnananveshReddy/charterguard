@@ -33,7 +33,7 @@ redis = ["redis>=5.0"]
 prometheus = ["prometheus-client>=0.20"]
 otel = ["opentelemetry-api>=1.24"]
 # Free-text PII (names, locations). Both also require a spaCy model download,
-# which pip cannot express -- see docs/ADAPTERS.md.
+# which pip cannot express -- see docs/adapters.md.
 spacy = ["spacy>=3.7"]
 presidio = ["presidio-analyzer>=2.2", "spacy>=3.7"]
 # Local model tier. onnxruntime + tokenizers only: no torch, no transformers,
@@ -43,6 +43,7 @@ onnx = ["onnxruntime>=1.17", "tokenizers>=0.15"]
 # Agent SDK adapters. Minimums are the versions the adapters were verified against.
 openai-agents = ["openai-agents>=0.24"]
 claude-agent-sdk = ["claude-agent-sdk>=0.2.176"]
+pydantic-ai = ["pydantic-ai-slim>=2.65"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.6", "mypy>=1.10", "pre-commit>=3.7"]
 
 [tool.hatch.build.targets.wheel]

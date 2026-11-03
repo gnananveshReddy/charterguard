@@ -12,6 +12,11 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Pydantic AI integration: `guard_capability(pipeline)` checks the prompt, tool
+  calls, tool results and final output of an agent run (`[pydantic-ai]` extra).
+- Documentation site (`mkdocs.yml`, mkdocs-material, built `--strict` in CI and
+  deployed to GitHub Pages from `main`), split from the README, plus a "How it
+  compares" page. The README is now a short overview that links into the docs.
 - Rule packs: TOML rule files loaded with `load_rule_pack()` or `bundled_rule_pack()`
   and passed as `GuardrailPipeline(rule_packs=[...])`. Every rule's examples and
   counterexamples run through the real scanner at load time; patterns that could
