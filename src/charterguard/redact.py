@@ -96,26 +96,31 @@ def redact(
     if not targets:
         return RedactionResult(text, ())
 
-    # Right-to-left replacement keeps earlier spans valid. Overlaps resolved by
-    # widest-first so a nested match cannot leave a fragment behind.
+    # Right-to-left replacement keeps earlier spans valid. Overlapping spans
+    # are merged into their UNION: dropping a partially overlapping finding
+    # would leave its tail in the clear ("1234-4111-1111-1111-1111": a phone
+    # match on the head, a card on the rest). The widest finding at each start
+    # names the merged span.
     targets.sort(key=lambda f: (f.start, -(f.end - f.start)))
-    merged: list[Finding] = []
+    merged: list[tuple[int, int, Finding]] = []
     for f in targets:
-        if merged and f.start < merged[-1].end:
+        if merged and f.start < merged[-1][1]:
+            s, e, owner = merged[-1]
+            merged[-1] = (s, max(e, f.end), owner)
             continue
-        merged.append(f)
+        merged.append((f.start, f.end, f))
 
     out = text
     redactions: list[Redaction] = []
-    for f in reversed(merged):
-        raw = text[f.start : f.end]
+    for start, end, f in reversed(merged):
+        raw = text[start:end]
         kind = _kind_for(f.rule_id)
         digest = value_digest(raw, config.digest_chars)
         placeholder = config.placeholder.format(kind=kind)
         if config.keep_digest:
             placeholder = f"{placeholder[:-1]}:{digest}]" if placeholder.endswith("]") else placeholder
-        out = out[: f.start] + placeholder + out[f.end :]
-        redactions.append(Redaction(kind, f.rule_id, f.start, f.end, digest))
+        out = out[:start] + placeholder + out[end:]
+        redactions.append(Redaction(kind, f.rule_id, start, end, digest))
 
     redactions.reverse()
     return RedactionResult(out, tuple(redactions))

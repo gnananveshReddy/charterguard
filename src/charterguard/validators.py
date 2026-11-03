@@ -158,3 +158,44 @@ def iban_ok(candidate: str) -> bool:
     rearranged = s[4:] + s[:4]
     digits_only = "".join(str(int(ch, 36)) for ch in rearranged)
     return int(digits_only) % 97 == 1
+
+
+def _card_lengths(d: str) -> tuple[int, ...]:
+    """Lengths a card number starting with ``d`` can have, by issuer (IIN)."""
+    two, three, four = int(d[:2] or 0), int(d[:3] or 0), int(d[:4] or 0)
+    if d.startswith("4"):
+        return (13, 16, 19)  # Visa
+    if 51 <= two <= 55 or 2221 <= four <= 2720:
+        return (16,)  # Mastercard
+    if two in (34, 37):
+        return (15,)  # Amex
+    if four == 6011 or 644 <= three <= 649 or two == 65:
+        return (16, 19)  # Discover
+    if 3528 <= four <= 3589:
+        return (16, 17, 18, 19)  # JCB
+    if two in (36, 38, 39) or 300 <= three <= 305:
+        return (14, 15, 16, 17, 18, 19)  # Diners
+    if two in (60, 62, 81, 82) or three == 508:
+        return (16, 17, 18, 19)  # RuPay / UnionPay
+    return ()
+
+
+def card_subspan(candidate: str) -> tuple[int, int] | None:
+    """A real card inside a digit run that failed Luhn as a whole.
+
+    Only spans that start AND end on a group boundary, carry a known issuer
+    prefix with that issuer's length, and pass Luhn are considered, so a decoy
+    group ("4111 4111 1111 1111 1111") cannot hide a card, while ordinary
+    grouped order numbers and unbroken digit runs (no inner boundaries) do not
+    turn into chance Luhn matches.
+    """
+    positions = [i for i, ch in enumerate(candidate) if ch.isdigit()]
+    starts = [k for k, i in enumerate(positions) if k == 0 or i != positions[k - 1] + 1]
+    ends = {k for k, i in enumerate(positions) if k == len(positions) - 1 or positions[k + 1] != i + 1}
+    d = "".join(candidate[i] for i in positions)
+    for k in starts:
+        for length in _card_lengths(d[k:]):
+            last = k + length - 1
+            if last < len(d) and last in ends and (k, last) != (0, len(d) - 1) and luhn_ok(d[k : last + 1]):
+                return positions[k], positions[last] + 1
+    return None

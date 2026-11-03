@@ -97,6 +97,13 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 - `jb.unrestricted` also covers "an AI without any guidelines".
 
 ### Fixed
+- Redaction merged partially overlapping findings by dropping the later one,
+  leaving its tail in the clear (a phone match on the head of a run, a card on
+  the rest). Overlaps are now redacted as their union.
+- A decoy group before or after a card number (`4111 4111 1111 1111 1111`)
+  hid it: the run failed Luhn as a whole and was skipped. A rejected run is
+  now searched for one group-aligned span with a real issuer prefix and length.
+  IBAN and GSTIN candidates are re-examined from each token inside a rejected run.
 - `pii.iban` matched any token shaped like two letters, two digits and alphanumerics, so
   hex digests, git SHAs and random ids (`ab12f9e8c7d6b5a4`) were redacted as IBANs. It now
   requires an ISO 13616 country code, that country's length and a valid mod-97 checksum,

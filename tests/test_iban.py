@@ -87,3 +87,22 @@ def test_long_digit_runs_still_do_not_manufacture_card_matches():
         run = "".join(rng.choice("0123456789") for _ in range(40))
         verdict = p.check_output(f"order ref {run} shipped")
         assert not any(f.rule_id.startswith("pii.card") for f in verdict.findings), run
+
+
+def test_a_decoy_group_does_not_hide_a_card():
+    p = GuardrailPipeline()
+    for text, leaked in [
+        ("card 4111 4111 1111 1111 1111 ok", "1111 1111 1111"),   # decoy before
+        ("card 4111 1111 1111 1111 9999 ok", "1111 1111 1111"),   # decoy after
+        ("amex 1111 3782 822463 10005 x", "822463"),              # Amex, 4-6-5 groups
+    ]:
+        out = p.check_output(text).sanitized or ""
+        assert "[REDACTED:CARD:" in out and leaked not in out, (text, out)
+
+
+def test_partially_overlapping_findings_are_redacted_as_their_union():
+    # A phone match on the head and a card on the rest used to keep only the
+    # first, leaving the card's tail in the clear.
+    p = GuardrailPipeline()
+    out = p.check_output("pay 1234-4111-1111-1111-1111 now").sanitized or ""
+    assert "1111" not in out and out.startswith("pay [REDACTED:") and out.endswith(" now"), out
