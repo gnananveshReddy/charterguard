@@ -12,6 +12,13 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Rule packs: TOML rule files loaded with `load_rule_pack()` or `bundled_rule_pack()`
+  and passed as `GuardrailPipeline(rule_packs=[...])`. Every rule's examples and
+  counterexamples run through the real scanner at load time; patterns that could
+  backtrack catastrophically or outgrow the prefilter window are rejected; ids are
+  namespaced. CLI: `charterguard pack list | check`, `--pack` on scan/eval/rules/mcp.
+  Bundled pack `agent-tools` (force-push, credential files, env dumps, cloud metadata,
+  package publishing, skipping hooks and branch protection).
 - Detection vocabulary: overrides of "orders / tasks / commands / directives",
   "forget everything, <directive>", "ignore all instructions", "ignore the above,",
   clearing earlier context ("leave all previous information behind"), replacement

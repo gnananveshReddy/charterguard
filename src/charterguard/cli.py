@@ -1,10 +1,12 @@
-"""Command-line interface: ``charterguard scan | eval | rules | policy | mcp | version``.
+"""Command-line interface: ``charterguard scan | eval | rules | policy | pack | mcp | version``.
 
     echo "ignore all previous instructions" | charterguard scan
     charterguard scan --layer untrusted retrieved/*.md --json
     charterguard scan --layer output --redact reply.txt > reply.safe.txt
     charterguard eval my_prompts.jsonl --label-field is_attack
     charterguard rules --category injection
+    charterguard scan --layer tool --pack agent-tools fetched.html
+    charterguard pack check my-pack.toml
 
 Exit status, so the scanner drops into CI and pre-commit hooks:
 
@@ -30,6 +32,7 @@ from .config import GuardrailConfig
 from .patterns import RULES
 from .pipeline import GuardrailPipeline
 from .policy_file import PolicyError, load_policy, policy_to_mapping
+from .rulepack import RulePack, RulePackError, bundled_rule_pack, bundled_rule_packs, combine_rules, load_rule_pack
 from .types import Action, Category, Layer, Verdict
 
 _LAYERS = {
@@ -54,8 +57,23 @@ def _config(args: argparse.Namespace) -> GuardrailConfig:
     return GuardrailConfig.strict() if args.strict else GuardrailConfig()
 
 
+def _load_pack(ref: str) -> RulePack:
+    """A pack file path, or the name of a pack bundled with charterguard."""
+    path = Path(ref)
+    if path.suffix == ".toml" or path.exists():
+        return load_rule_pack(path)
+    return bundled_rule_pack(ref)
+
+
+def _packs(args: argparse.Namespace) -> list[RulePack]:
+    try:
+        return [_load_pack(ref) for ref in getattr(args, "pack", None) or ()]
+    except RulePackError as exc:
+        raise SystemExit(f"charterguard: {exc}") from exc
+
+
 def _pipeline(args: argparse.Namespace) -> GuardrailPipeline:
-    return GuardrailPipeline(_config(args))
+    return GuardrailPipeline(_config(args), rule_packs=_packs(args))
 
 
 def _check(p: GuardrailPipeline, layer: str, text: str, source: str) -> tuple[Verdict, str | None]:
@@ -202,8 +220,13 @@ def _cmd_eval(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
 
 # -------------------------------------------------------------------- rules
 def _cmd_rules(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
+    packs = _packs(args)
+    try:
+        source = combine_rules(packs) if packs else RULES
+    except RulePackError as exc:
+        raise SystemExit(f"charterguard: {exc}") from exc
     rules = [
-        r for r in RULES
+        r for r in source
         if (args.category is None or r.category.value == args.category)
         and (args.layer is None or _LAYERS[args.layer] in r.layers)
     ]
@@ -242,6 +265,35 @@ def _cmd_policy(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
     return 0
 
 
+def _cmd_pack(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
+    """``pack list``: bundled packs. ``pack check``: load and self-test packs."""
+    if args.action == "list":
+        for name in bundled_rule_packs():
+            pack = bundled_rule_pack(name)
+            out.write(f"{pack.name:<24} {pack.version:<10} {len(pack.rules):>3} rules  {pack.description}\n")
+        return 0
+    if not args.refs:
+        raise SystemExit("charterguard: pack check needs at least one pack file or bundled pack name")
+    failed = 0
+    loaded: list[RulePack] = []
+    for ref in args.refs:
+        try:
+            pack = _load_pack(ref)
+        except RulePackError as exc:
+            out.write(f"invalid: {exc}\n")
+            failed += 1
+            continue
+        loaded.append(pack)
+        out.write(f"ok: {pack.name} {pack.version} ({len(pack.rules)} rules, every example checked)\n")
+    if loaded:
+        try:
+            combine_rules(loaded)
+        except RulePackError as exc:
+            out.write(f"conflict: {exc}\n")
+            failed += 1
+    return 1 if failed else 0
+
+
 def _cmd_mcp(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
     from .integrations.mcp import serve_stdio
 
@@ -264,6 +316,11 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--strict", action="store_true", help="use GuardrailConfig.strict()")
         sp.add_argument("--policy", metavar="FILE", help="TOML/JSON policy file (see charterguard.policy_file)")
         sp.add_argument("--json", action="store_true", help="machine-readable output")
+        pack_arg(sp)
+
+    def pack_arg(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--pack", action="append", metavar="FILE_OR_NAME",
+                        help="add a rule pack: a .toml file or a bundled pack name (repeatable)")
 
     scan = sub.add_parser("scan", help="scan files or stdin")
     scan.add_argument("paths", nargs="*", help="files to scan; '-' or nothing reads stdin")
@@ -285,19 +342,26 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--max-fpr", type=float, help="exit 1 above this false-positive rate")
     ev.set_defaults(func=_cmd_eval)
 
-    rules = sub.add_parser("rules", help="list built-in rules")
+    rules = sub.add_parser("rules", help="list built-in rules (plus any --pack rules)")
     rules.add_argument("--category", choices=sorted(c.value for c in Category))
     rules.add_argument("--layer", choices=sorted(_LAYERS))
     rules.add_argument("--json", action="store_true")
+    pack_arg(rules)
     rules.set_defaults(func=_cmd_rules)
 
     policy = sub.add_parser("policy", help="validate a policy file and print the effective policy")
     policy.add_argument("path")
     policy.set_defaults(func=_cmd_policy)
 
+    pack = sub.add_parser("pack", help="list bundled rule packs, or validate pack files")
+    pack.add_argument("action", choices=("list", "check"))
+    pack.add_argument("refs", nargs="*", metavar="FILE_OR_NAME")
+    pack.set_defaults(func=_cmd_pack)
+
     mcp = sub.add_parser("mcp", help="run as an MCP server over stdio")
     mcp.add_argument("--strict", action="store_true", help="use GuardrailConfig.strict()")
     mcp.add_argument("--policy", metavar="FILE", help="TOML/JSON policy file")
+    pack_arg(mcp)
     mcp.set_defaults(func=_cmd_mcp)
 
     version = sub.add_parser("version", help="print the version")
