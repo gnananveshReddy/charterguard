@@ -1,0 +1,23 @@
+name: Feature or adapter request
+description: A new capability, framework adapter, language, or rule family.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to protect, and where does charterguard fall short today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The API or behaviour you have in mind. Sketches are fine.
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: I understand the core must stay dependency-free; new third-party packages go behind an optional extra.
+          required: true

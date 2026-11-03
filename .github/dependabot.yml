@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # Workflow actions: keeps the pinned versions in CI, CodeQL, Scorecard and
+  # the release workflow current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  # Optional extras and dev tools. The core has no runtime dependencies, so
+  # these only move the CI matrix.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

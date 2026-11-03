@@ -12,6 +12,11 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 ## [Unreleased]
 
 ### Added
+- Project hygiene: CONTRIBUTING, CODE_OF_CONDUCT (Contributor Covenant 2.1),
+  issue templates for missed attacks / false positives / bugs / features, a PR
+  template, Dependabot, CodeQL, OpenSSF Scorecard, and a release workflow with
+  PyPI trusted publishing (tag must match the version; wheel smoke-tested).
+  SECURITY.md now points to GitHub private vulnerability reporting.
 - OpenAI Agents SDK guardrails (input, output, tool input, tool output; input runs
   blocking) and Claude Agent SDK hooks (UserPromptSubmit, PreToolUse, PostToolUse,
   per-session ceilings). Extras `openai-agents`, `claude-agent-sdk`; both run in CI.
@@ -89,6 +94,12 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
   unknown ones (`(?P=`, conditionals) fall back to a full scan.
 
 ### Security
+- **Short-circuit redaction bypass.** With default modes an injection phrase is
+  CRITICAL but only flags; the scan stopped there, so a secret or PII value in the
+  same text was never matched. `check_output` returned FLAG with the key
+  unredacted, and `check_input` let a credential through. Short-circuiting now
+  only ends the scan when the CRITICAL finding already decides a BLOCK; otherwise
+  every detector re-runs to completion for BLOCK-mode and redaction categories.
 - HTTP adapters (`HttpModelScorer`, `OpenAIModerationScorer`,
   `HttpIntentClassifier`, `HttpEntityRecognizer`) now accept only `https`, or
   `http` with `allow_insecure_http=True`. Previously the opt-in admitted any

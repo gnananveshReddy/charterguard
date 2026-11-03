@@ -65,7 +65,7 @@ from .refusals import refusal_for
 from .patterns import rules_for
 from .scanner import CompiledRuleSet, ResultCache, compile_rules, content_key
 from .scope import Charter, IntentClassifier, ScopeGate
-from .types import Action, Category, Finding, Layer, Severity, Timer, Verdict
+from .types import Action, Category, Finding, Layer, Mode, Severity, Timer, Verdict
 
 _T = TypeVar("_T")
 
@@ -111,6 +111,8 @@ class GuardrailPipeline:
         "_metrics",
         "_audit",
         "_all_input_rules",
+        "_complete_cfg",
+        "_must_complete",
     )
 
     def __init__(
@@ -151,6 +153,15 @@ class GuardrailPipeline:
         self._audit: Any = audit_sink
         # Built on first use by quoted-mention dampening; most pipelines never need it.
         self._all_input_rules: CompiledRuleSet | None = None
+        # Short-circuiting on CRITICAL is only sound when that finding already
+        # decides the verdict. These categories must always be scanned to the
+        # end: anything that would BLOCK, and anything that must be redacted.
+        cfg = self.config
+        redact = set(cfg.redaction.redact_categories) if cfg.redaction.enabled else set()
+        self._must_complete: frozenset[Category] = frozenset(
+            redact | {c for c in Category if cfg.mode(c) is Mode.BLOCK}
+        )
+        self._complete_cfg = replace(cfg, short_circuit_on_critical=False)
 
     # ------------------------------------------------------------------ core
     def _scan(self, text: str, layer: Layer) -> tuple[tuple[Finding, ...], bool]:
@@ -179,6 +190,21 @@ class GuardrailPipeline:
                 f.severity is Severity.CRITICAL for f in findings
             ):
                 break
+        else:
+            return findings  # no short-circuit: the scan was complete
+        decided = any(
+            f.severity is Severity.CRITICAL and cfg.mode(f.category) is Mode.BLOCK for f in findings
+        )
+        if decided:
+            return findings  # the verdict is BLOCK; nothing more can change it
+        # A CRITICAL finding stopped the scan but does not block (e.g. an
+        # injection phrase in FLAG mode). Without this pass, a secret placed
+        # next to that phrase would be neither blocked nor redacted. Re-run
+        # every detector to the end and keep what the stop may have hidden.
+        for detector in self._detectors:
+            findings.extend(
+                f for f in detector.scan(nt, layer, self._complete_cfg) if f.category in self._must_complete
+            )
         return findings
 
     def _dampen_quoted_mentions(

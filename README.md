@@ -1,5 +1,12 @@
 # charterguard
 
+[![ci](https://github.com/gnananveshReddy/charterguard/actions/workflows/ci.yml/badge.svg)](https://github.com/gnananveshReddy/charterguard/actions/workflows/ci.yml)
+[![codeql](https://github.com/gnananveshReddy/charterguard/actions/workflows/codeql.yml/badge.svg)](https://github.com/gnananveshReddy/charterguard/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/gnananveshReddy/charterguard/badge)](https://scorecard.dev/viewer/?uri=github.com/gnananveshReddy/charterguard)
+![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
+![dependencies](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A framework-agnostic guardrail pipeline for LLM agent harnesses: prompt-injection
 and jailbreak detection, harmful-content and destructive-command rules, scope
 enforcement against an agent charter, untrusted-content envelopes, tool-output
@@ -559,6 +566,13 @@ and does anything actually fire it? A rule that never fires is either dead
   stall the event loop of an async server.
 * **Charter.** `Charter.fingerprint()` is stable, so scope decisions can be
   attributed to an exact charter version in the audit trail.
+
+## Contributing
+
+Missed attacks and false positives are the most useful contributions; the issue
+templates ask for exactly what is needed to fix them. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for setup and the rule-change checklist, and
+[SECURITY.md](SECURITY.md) for reporting bypasses privately.
 
 ## Security assumptions and limits
 
