@@ -131,3 +131,18 @@ class RuleDetector:
                 )
             )
         return findings
+
+
+def layered_rulesets(rules: Sequence[Rule], categories: Sequence[Category]) -> dict[Layer, CompiledRuleSet]:
+    """One compiled rule set per layer for a detector that re-scans derived
+    text (decoded payloads, de-obfuscated views): the rules for that layer
+    plus every untrusted-layer rule, so a pack rule scoped to any layer is
+    applied to its layer's derived text as well."""
+    untrusted = rules_for(layer=Layer.UNTRUSTED, categories=categories, rules=rules)
+    out: dict[Layer, CompiledRuleSet] = {}
+    for layer in Layer:
+        own = rules_for(layer=layer, categories=categories, rules=rules)
+        merged = tuple({r.id: r for r in (*untrusted, *own)}.values())
+        if merged:
+            out[layer] = compile_rules(merged)
+    return out
