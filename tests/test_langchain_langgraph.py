@@ -621,7 +621,15 @@ def test_approval_node_can_also_review_merely_flagged_traffic():
 
 def test_approval_node_needs_langgraph_only_when_no_interrupt_is_supplied():
     """Importing the module stays free; the dependency is per-call."""
-    with pytest.raises(ImportError):
+    try:
+        import langgraph  # noqa: F401
+    except ImportError:
+        with pytest.raises(ImportError):
+            lg.approval_node()({"guardrail": {"blocked": True}})
+        return
+    # With langgraph installed the real interrupt() is resolved, and it refuses
+    # to run outside a graph -- which proves it was the one called.
+    with pytest.raises(RuntimeError):
         lg.approval_node()({"guardrail": {"blocked": True}})
 
 
