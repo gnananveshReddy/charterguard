@@ -11,6 +11,10 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-04
+
+First public release under the name **charterguard**.
+
 ### Added
 - Browser playground on the docs site (`docs/playground.md`): the package's own
   wheel, built by `scripts/build_playground.py` in the docs workflow, runs in
@@ -159,10 +163,6 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 - ONNX model downloads follow redirects only to `https` URLs.
 - `SqliteCounterStore` asserts at import that interpolated column names are
   plain identifiers; all values were and remain bound parameters.
-
-## [0.1.0]
-
-First public release under the name **charterguard**.
 
 ### Changed
 - Renamed the distribution and import package from `agent-guardrails` /
