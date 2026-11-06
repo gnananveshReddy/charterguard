@@ -1,0 +1,4 @@
+# Type checker plus the extras whose types src/charterguard imports.
+mypy
+fastapi>=0.110
+langchain-core>=0.3

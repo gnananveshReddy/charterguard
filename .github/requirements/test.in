@@ -1,0 +1,3 @@
+# Test runner for the CI corpus job (charterguard itself has no runtime deps).
+pytest
+pytest-asyncio
