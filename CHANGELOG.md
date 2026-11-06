@@ -11,6 +11,10 @@ Until 1.0 the public API may change in minor releases; pin an exact version.
 
 ## [Unreleased]
 
+### Changed
+- Package metadata: PyPI classifiers (Python versions, licence, typed) and
+  project links to the docs, source, changelog and issue tracker.
+
 ## [0.1.0] - 2026-11-04
 
 First public release under the name **charterguard**.

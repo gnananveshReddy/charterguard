@@ -10,9 +10,30 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 keywords = ["llm", "agents", "guardrails", "prompt-injection", "security"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
 # Deliberately zero runtime dependencies: this component must drop into any
 # project without dragging a framework, a model SDK, or a regex engine with it.
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/gnananveshReddy/charterguard"
+Documentation = "https://gnananveshreddy.github.io/charterguard/"
+Source = "https://github.com/gnananveshReddy/charterguard"
+Changelog = "https://github.com/gnananveshReddy/charterguard/blob/main/CHANGELOG.md"
+Issues = "https://github.com/gnananveshReddy/charterguard/issues"
 
 [project.scripts]
 charterguard = "charterguard.cli:main"
