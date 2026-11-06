@@ -1,0 +1,3 @@
+# Docs site toolchain. Compile docs/requirements.txt from this file.
+mkdocs==1.6.1
+mkdocs-material==9.8.0

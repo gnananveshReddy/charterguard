@@ -16,3 +16,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+  # Hash-pinned CI tool locks (lint, typing, test, build) and the docs
+  # toolchain. Each .txt is compiled from the .in beside it:
+  #   uv pip compile --generate-hashes --python-version 3.12   #     --python-platform linux -o X.txt X.in
+  - package-ecosystem: pip
+    directories: ["/.github/requirements", "/docs"]
+    schedule:
+      interval: weekly
+    groups:
+      ci-tools:
+        patterns: ["*"]

@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install "ruff>=0.6"
+      - run: pip install --require-hashes -r .github/requirements/lint.txt
       - run: ruff check --output-format=github .
 
   core:
@@ -178,7 +178,9 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install -e ".[langchain,fastapi,dev]" mypy
+      - run: |
+          pip install --require-hashes -r .github/requirements/typing.txt
+          pip install --no-deps -e .
       - name: py.typed marker ships
         run: test -f src/charterguard/py.typed
       - name: mypy
@@ -193,7 +195,9 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]"
+      - run: |
+          pip install --require-hashes -r .github/requirements/test.txt
+          pip install --no-deps -e .
       - name: Corpus recall and false-positive budget
         run: python -m pytest tests/test_corpus.py tests/test_fuzz.py -q
       - name: Benchmarks must at least run
@@ -209,7 +213,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
-      - run: pip install build
+      - run: pip install --require-hashes -r .github/requirements/build.txt
       - run: python -m build
       - name: Install the wheel in a clean env and import it
         run: |
