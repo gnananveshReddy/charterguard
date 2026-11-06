@@ -9,6 +9,10 @@ on:
     # against a refreshed corpus, and a dependency that moved under an extra.
     - cron: "0 6 * * 1"
 
+# Every job only reads the repository. Jobs that need more must ask for it.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
